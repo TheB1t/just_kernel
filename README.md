@@ -1,3 +1,3 @@
-# kernel
+# µOS kernel
 
-Initial kernel repo
+A hybrid kernel for µOS (in future)
