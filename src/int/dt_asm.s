@@ -1,0 +1,32 @@
+[GLOBAL gdt_flush]
+type gdt_flush function
+gdt_flush:
+	mov eax, [esp + 4]
+	lgdt [eax]
+
+	mov ax, 0x10
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	mov ss, ax
+
+	jmp 0x08:.flush
+.flush:
+	ret
+
+[GLOBAL idt_flush]
+type idt_flush function
+idt_flush:
+	mov eax, [esp + 4]
+	lidt [eax]
+	ret
+
+[GLOBAL tss_flush]
+type tss_flush function
+tss_flush:
+	xor eax, eax
+	mov eax, [esp + 4]
+	or ax, 3
+	ltr ax
+	ret

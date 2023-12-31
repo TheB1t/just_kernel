@@ -14,7 +14,7 @@ void screen_setColor(screen_color color) {
 	current_color = color;
 }
 
-static void screen_moveCursor() {
+void screen_moveCursor() {
 	uint16_t cursor_location = (cursor.y * SCREEN_WIDTH) + cursor.x;
 	port_outb(0x3D4, 14);
 	port_outb(0x3D5, cursor_location >> 8);
@@ -22,7 +22,7 @@ static void screen_moveCursor() {
 	port_outb(0x3D5, cursor_location);
 }
 
-static void screen_scroll() {
+void screen_scroll() {
 	if (cursor.y >= SCREEN_HEIGHT) {
 		for (uint32_t i = 0 * SCREEN_WIDTH; i < (SCREEN_HEIGHT - 1) * SCREEN_WIDTH; i++) {
 			framebuffer[i] = framebuffer[i + SCREEN_WIDTH];
