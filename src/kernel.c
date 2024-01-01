@@ -3,6 +3,7 @@
 
 #include <drivers/early_screen.h>
 #include <drivers/serial.h>
+#include <drivers/pit.h>
 
 #include <int/dt.h>
 #include <int/isr.h>
@@ -28,6 +29,7 @@ int32_t kmain(multiboot_t* mboot) {
     dt_init();
 
     mm_memory_setup(mboot);
+    pit_init();
 
     kprintf("[early_screen] Hello from kernel!\n");
     sprintf("[serial] Hello from kernel!\n");
@@ -41,6 +43,9 @@ int32_t kmain(multiboot_t* mboot) {
     print_mem();
     kfree(c);
     print_mem();
+
+    sleep_no_task(2000);
+    sprintf("DONE!\n");
 
     for (;;);
     return 0xDEADBABA;
