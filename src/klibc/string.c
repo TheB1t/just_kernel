@@ -52,26 +52,31 @@ void reverse(char str[]) {
     }
 }
 
+void _vtoa(char* result, uint32_t base, int32_t value) {
+    if (base < 2 || base > 36) {
+        *result = '\0';
+    }
+
+    char *ptr = result, *ptr1 = result, tmp_char;
+    int tmp_value;
+
+    do {
+        tmp_value = value;
+        value /= base;
+        *ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz"[35 + (tmp_value - value * base)];
+    } while (value);
+
+    if (tmp_value < 0) *ptr++ = '-';
+    *ptr-- = '\0';
+    while (ptr1 < ptr) {
+        tmp_char = *ptr;
+        *ptr-- = *ptr1;
+        *ptr1++ = tmp_char;
+    }
+}
+
 void itoa(int32_t n, char str[]) {
-    uint32_t i;
-    i = 0;
-    int32_t n_inv = abs(n); // inverted n, if it was negative
-    uint32_t abs_n = (uint32_t) n_inv;
-    if (abs_n == 0) {
-        str[i++] = '0';
-    }
-    while (abs_n > 0) {
-        str[i++] = (abs_n % 10) + '0'; // Calculate the current lowest value digit and convert it
-        abs_n /= 10;
-    }
-
-    if (n_inv != n) {
-        str[i++] = '-';
-    }
-
-    str[i] = '\0';
-
-    reverse(str);
+    _vtoa(str, 10, n);
 }
 
 void utoa(uint32_t n, char str[]) {
@@ -101,29 +106,10 @@ uint32_t atou(char str[]) {
 }
 
 void htoa(uint32_t in, char str[]) {
-    uint32_t pos = 0;
-    uint8_t tmp;
-
-    str[pos++] = '0';
-    str[pos++] = 'x';
-
-    for (uint16_t i = 60; i > 0; i -= 4) {
-        tmp = (uint8_t)((in >> i) & 0xf);
-        if (tmp >= 0xa) {
-            str[pos++] = (tmp - 0xa) + 'A';
-        } else {
-            str[pos++] = tmp + '0';
-        }
-    }
-
-    tmp = (uint8_t)(in & 0xf);
-    if (tmp >= 0xa) {
-        str[pos++] = (tmp - 0xa) + 'A';
-    } else {
-        str[pos++] = tmp + '0';
-    }
-    str[pos] = '\0'; // nullify 
+    _vtoa(str, 16, in);
 }
+
+
 
 void strcat(char *dst, char *src) {
     char *end = dst + strlen(dst);

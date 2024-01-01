@@ -1,15 +1,17 @@
 MBOOT_PAGE_ALIGN    equ 1<<1
-MBOOT_MEM_INFO      equ 0<<1
+MBOOT_MEM_INFO      equ 1<<1
 MBOOT_HEADER_MAGIC  equ 0x1BADB002
 MBOOT_HEADER_FLAGS  equ MBOOT_PAGE_ALIGN | MBOOT_MEM_INFO
 MBOOT_CHECKSUM      equ -(MBOOT_HEADER_MAGIC + MBOOT_HEADER_FLAGS)
 
 [BITS 32]
 
+[GLOBAL stack]
 [GLOBAL mboot]
-[EXTERN code]
-[EXTERN bss]
-[EXTERN end]
+[EXTERN __kernel_code_start]
+[EXTERN __kernel_bss_start]
+[EXTERN __kernel_start]
+[EXTERN __kernel_end]
 
 mboot:
   dd  MBOOT_HEADER_MAGIC
@@ -17,17 +19,27 @@ mboot:
   dd  MBOOT_CHECKSUM
    
   dd  mboot
-  dd  code
-  dd  bss
-  dd  end
-  dd  start
+  dd  __kernel_code_start
+  dd  __kernel_bss_start
+  dd  __kernel_end
+  dd  __kernel_start
+
+section .bss
+
+stack:
+    resb 4096
+  .top:
+
+section .text
 
 [GLOBAL start]
 [EXTERN kmain]
 type start function
 start:
+  xor ebp, ebp
+  mov esp, stack
+
   push    ebx
   ; Execute the kernel:
   cli
-  xor ebp, ebp
   call kmain  

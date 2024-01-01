@@ -4,7 +4,6 @@
 #define SCREEN_HEIGHT 25
 
 #include <klibc/stdlib.h>
-#include <klibc/stdio.h>
 #include <io/ports.h>
 
 typedef struct {

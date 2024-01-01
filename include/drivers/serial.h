@@ -1,7 +1,6 @@
 #pragma once
 
 #include <klibc/stdlib.h>
-#include <klibc/stdio.h>
 #include <klibc/stdarg.h>
 #include <io/ports.h>
 

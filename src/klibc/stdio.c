@@ -21,12 +21,12 @@ void _vprintf(printf_putchar_t putchar, const char* format, va_list args) {
 	while ((c = *format++) != 0) {
 		padRight = 0;
 		sym = ' ';
+		num = 0;
 		
 		if (c != '%')
 			putchar(c);
 		else {
 			char* p;
-			char* p2;
 	
 			c = *format++;
 		back:
