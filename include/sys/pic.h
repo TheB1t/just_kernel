@@ -1,5 +1,7 @@
 #pragma once
 
+#include <klibc/stdlib.h>
+
 #define PIC1			0x20
 #define PIC2			0xA0
 #define PIC1_COMMAND	PIC1
@@ -21,8 +23,9 @@
 #define ICW4_BUF_MASTER	0x0C
 #define ICW4_SFNM		0x10
 
-void pic_remap(int offset1, int offset2);
+void pic_remap(uint8_t offset1, uint8_t offset2);
 void pic_disable();
 
 void pic_sendEOI_master();
 void pic_sendEOI_slave();
+void pic_sendEOI(uint32_t isr);

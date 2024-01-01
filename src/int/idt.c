@@ -286,4 +286,5 @@ void idt_init() {
 	SET_GATE_ISR(255);
 
 	idt_flush((uint32_t)&idt);
+    asm volatile("sti");
 }

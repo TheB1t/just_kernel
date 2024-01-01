@@ -1,7 +1,10 @@
 #include <sys/pic.h>
 #include <io/ports.h>
 
-void pic_remap(int offset1, int offset2) {
+uint8_t pic_master_offset = 0;
+uint8_t pic_slave_offset = 8;
+
+void pic_remap(uint8_t offset1, uint8_t offset2) {
 	uint8_t a1, a2;
 
 	a1 = port_inb(PIC1_DATA);
@@ -21,6 +24,9 @@ void pic_remap(int offset1, int offset2) {
 
 	port_outb(PIC1_DATA, a1);
 	port_outb(PIC2_DATA, a2);
+
+	pic_master_offset = offset1;
+	pic_slave_offset = offset2;
 }
 
 void pic_disable() {
@@ -34,4 +40,13 @@ void pic_sendEOI_master() {
 
 void pic_sendEOI_slave() {
 	port_outb(PIC2_COMMAND, PIC_EOI);
+}
+
+void pic_sendEOI(uint32_t isr) {
+	if (isr >= pic_master_offset && isr <= pic_slave_offset + 7) {
+		if (isr >= pic_slave_offset)
+			pic_sendEOI_slave();
+
+		pic_sendEOI_master();
+	}
 }

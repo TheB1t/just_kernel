@@ -66,6 +66,10 @@ void* virt_to_phys(void* virt, vmm_table_t* table0) {
 void vmm_ensure_table(vmm_table_t* table, uint16_t offset) {
     if (!(table->entries[offset] & VMM_PRESENT)) {
         uint32_t new_table = (uint32_t)pmm_alloc(PAGE_SIZE);
+
+        if (!is_mapped((void*)new_table))
+            vmm_map((void*)new_table, (void*)new_table, 1, VMM_PRESENT | VMM_WRITE | VMM_USER);
+
         memset((uint8_t*)new_table, 0, PAGE_SIZE);
         table->entries[offset] = new_table | VMM_PRESENT | VMM_WRITE | VMM_USER;
     }
@@ -216,8 +220,7 @@ void vmm_memory_setup(uint32_t kernel_start, uint32_t kernel_len) {
     void* new_cr3 = pmm_alloc(PAGE_SIZE);
     memset(new_cr3, 0, PAGE_SIZE);
 
-    vmm_map_pages((void*)0, (void*)0, new_cr3, kernel_start_page, VMM_PRESENT | VMM_WRITE);
-    vmm_map_pages((void*)kernel_start, (void*)kernel_start, new_cr3, kernel_pages, VMM_PRESENT | VMM_WRITE);
+    vmm_map_pages((void*)0, (void*)0, new_cr3, kernel_start_page + kernel_pages, VMM_PRESENT | VMM_WRITE);
     vmm_set_base((uint32_t)new_cr3);
 
     register_int_handler(14, vmm_page_fault);
