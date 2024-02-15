@@ -1,6 +1,7 @@
 #include <int/isr.h>
 #include <int/idt.h>
 #include <sys/pic.h>
+#include <sys/apic.h>
 
 #include <drivers/serial.h>
 
@@ -17,4 +18,5 @@ void isr_handler(int_reg_t* regs) {
 		handler(regs);
 
 	pic_sendEOI(regs->int_num);
+	apic_EOI();
 }

@@ -89,16 +89,15 @@ uint8_t range_mapped(void* data, uint32_t size) {
     uint32_t pages = ((rounded_size + 0x1000 - 1) / 0x1000);
 
     for (uint32_t i = 0; i < pages; i++) {
-        if (!is_mapped((void*) cur_addr)) {
+        if (!is_mapped((void*) cur_addr))
             return 0;
-        }
+
         cur_addr += 0x1000;
     }
 
     return 1;
 }
 
-/* Get a table for a set of offsets into the table */
 vmm_table_t* vmm_get_table(vmm_table_off_t* offs, vmm_table_t* table) {
     vmm_ensure_table(table, offs->p0_off);
     return traverse_table(table, offs->p0_off);

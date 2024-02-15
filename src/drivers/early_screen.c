@@ -91,4 +91,5 @@ void screen_putString(char* c) {
 
 void screen_init() {
     _global_putchar = screen_putChar;
+	screen_clear();
 }

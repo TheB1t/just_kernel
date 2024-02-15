@@ -4,7 +4,7 @@
 
 extern symbol stack;
 
-void mm_memory_setup(multiboot_t* bootloader_info) {
+uint32_t mm_memory_setup(multiboot_t* bootloader_info) {
     if (!(bootloader_info->flags & MULTIBOOT_FLAG_MMAP))
         panic("Bootloader can't store memory map!\n");
 
@@ -54,4 +54,6 @@ void mm_memory_setup(multiboot_t* bootloader_info) {
     }
 
     vmm_memory_setup(kernel_start, kernel_len + PAGE_SIZE);
+
+    return 0;
 }

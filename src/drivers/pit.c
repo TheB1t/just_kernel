@@ -17,14 +17,17 @@ void pit_set_freq() {
     port_outb(0x40, high);
 }
 
-void pit_init() {
+uint32_t pit_init() {
     register_int_handler(32, timer_handler);
     pit_set_freq();
+
+    return 0;
 }
 
 void sleep_no_task(uint32_t ticks) {
     volatile uint32_t start_ticks = global_ticks;
-    while (global_ticks < ticks + start_ticks) asm volatile("pause");
+    while (global_ticks < ticks + start_ticks)
+        asm volatile("pause");
 }
 
 uint32_t stopwatch_start() {

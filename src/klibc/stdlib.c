@@ -73,8 +73,7 @@ void *krealloc(void *addr, uint32_t new_size) {
     memcpy((uint8_t*)data, (uint8_t*)new_buffer, header[0] - 0x1000);
 
     vmm_unmap(addr, 1);
-
-    kfree(addr);
+    kfree(addr + 0x1000);
     return new_buffer;
 }
 

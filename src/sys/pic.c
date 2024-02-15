@@ -4,7 +4,7 @@
 uint8_t pic_master_offset = 0;
 uint8_t pic_slave_offset = 8;
 
-void pic_remap(uint8_t offset1, uint8_t offset2) {
+uint32_t pic_remap(uint8_t offset1, uint8_t offset2) {
 	uint8_t a1, a2;
 
 	a1 = port_inb(PIC1_DATA);
@@ -27,6 +27,8 @@ void pic_remap(uint8_t offset1, uint8_t offset2) {
 
 	pic_master_offset = offset1;
 	pic_slave_offset = offset2;
+
+	return 0;
 }
 
 void pic_disable() {

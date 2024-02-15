@@ -14,4 +14,4 @@
 
 #define DESC_SEG(n, cpl)	(uint32_t)(((uint32_t)0x8 * (uint32_t)n) | (uint32_t)cpl)
 
-void dt_init();
+uint32_t dt_init();

@@ -4,7 +4,7 @@
 #include <int/isr.h>
 #include <io/ports.h>
 
-void        pit_init();
+uint32_t    pit_init();
 void        sleep_no_task(uint32_t ticks);
 
 uint32_t    stopwatch_start();

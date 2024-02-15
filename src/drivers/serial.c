@@ -3,6 +3,9 @@
 uint16_t _active_port = 0;
 
 void sprintf(const char* format, ...) {
+	if (!_active_port)
+		return;
+
     va_list va;
     va_start(va, format);
     _vprintf(serial_writeChar, format, va);
@@ -10,7 +13,7 @@ void sprintf(const char* format, ...) {
 }
 
 int32_t serial_init(uint16_t port, uint16_t baud) {
-	port_outb(port + 1, 0x00);									// Disable all interrupts
+	port_outb(port + UART_IER,		0x00);						// Disable all interrupts
 	port_outb(port + UART_LCR,		UART_LCR_DLAB);				// Enable DLAB (set baud rate divisor)
 	port_outb(port + UART_DL_LOW,	(baud & 0x00FF) >> 0);		// Set divisor to 3 (lo byte) 38400 baud
 	port_outb(port + UART_DL_HIGH,	(baud & 0xFF00) >> 8);		// (hi byte)
@@ -18,15 +21,7 @@ int32_t serial_init(uint16_t port, uint16_t baud) {
 	port_outb(port + UART_FCR,		0xC7);						// Enable FIFO, clear them, with 14-byte threshold
 	port_outb(port + UART_MCR,		0x0B);						// IRQs enabled, RTS/DSR set
 	port_outb(port + UART_MCR,		0x1E);						// Set in loopback mode, test the serial chip
-	port_outb(port + UART_DAR,		0xAE);						// Test serial chip (send byte 0xAE and check if serial returns same byte)
-	
-	// Check if serial is faulty (i.e: not same byte as sent)
-	if (port_inb(port + UART_DAR) != 0xAE)
-		return 1;
- 
-	// If serial is not faulty set it in normal operation mode
-	// (not-loopback with IRQs enabled and OUT#1 and OUT#2 bits enabled)
-	port_outb(port + UART_MCR, 0x0F);
+	port_outb(port + UART_MCR,		0x0F);
 
     if (!_active_port)
         _active_port = port;

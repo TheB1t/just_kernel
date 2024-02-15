@@ -3,7 +3,9 @@
 #include <int/idt.h>
 #include <int/isr.h>
 
-void dt_init() {
+uint32_t dt_init() {
 	gdt_init();
 	idt_init();
+
+	return 0;
 }

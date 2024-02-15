@@ -44,6 +44,7 @@ isr_common:
     _pushad
     xor eax, eax
 
+    cld
     push esp
     call isr_handler
     add esp, 4

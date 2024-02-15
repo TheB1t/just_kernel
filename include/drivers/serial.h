@@ -35,7 +35,14 @@
 #define UART_BAUD_115200	0x0001
 
 #define COM1 0x3F8
- 
+#define COM2 0x2F8
+#define COM3 0x3E8
+#define COM4 0x2E8
+#define COM5 0x5F8
+#define COM6 0x4F8
+#define COM7 0x5E8
+#define COM8 0x4E8
+
 void		sprintf(const char* format, ...);
 
 int32_t		serial_init(uint16_t port, uint16_t baud);

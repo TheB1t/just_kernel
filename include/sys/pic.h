@@ -23,7 +23,7 @@
 #define ICW4_BUF_MASTER	0x0C
 #define ICW4_SFNM		0x10
 
-void pic_remap(uint8_t offset1, uint8_t offset2);
+uint32_t pic_remap(uint8_t offset1, uint8_t offset2);
 void pic_disable();
 
 void pic_sendEOI_master();
