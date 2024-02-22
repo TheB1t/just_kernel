@@ -2,6 +2,7 @@
 
 #include <klibc/stdlib.h>
 #include <int/dt.h>
+#include <sys/smp.h>
 
 typedef struct {
     uint32_t    esi;
@@ -22,7 +23,7 @@ typedef struct {
     uint32_t    ss;
 } __attribute__((packed)) int_reg_t;
 
-typedef void (*int_handler_t) (int_reg_t*);
+typedef void (*int_handler_t) (int_reg_t*, core_locals_t*);
 
 void register_int_handler(uint8_t n, int_handler_t handler);
 

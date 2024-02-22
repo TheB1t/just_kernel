@@ -1,12 +1,16 @@
 #include <klibc/stdio.h>
+#include <klibc/lock.h>
 
+lock_t kprintf_lock;
 printf_putchar_t _global_putchar = NULL;
 
 void kprintf(const char* format, ...) {
+	lock(kprintf_lock);
     va_list va;
     va_start(va, format);
     _vprintf(_global_putchar, format, va);
     va_end(va);
+	unlock(kprintf_lock);
 }
 
 void _vprintf(printf_putchar_t putchar, const char* format, va_list args) {

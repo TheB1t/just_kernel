@@ -1,4 +1,6 @@
+[BITS 32]
 [SECTION .text]
+
 [GLOBAL ioapic_read]
 type ioapic_read function
 ioapic_read:
@@ -21,20 +23,20 @@ ioapic_write:
 [GLOBAL read_lapic]
 type read_lapic function
 read_lapic:
-    mov     eax, [esp + 4]
-    and     eax, 0xFFFF
-    add     eax, [lapic_base]
-    mov     eax, [eax]
+    mov eax, [esp + 4]
+    and eax, 0xFFFF
+    add eax, [lapic_base]
+    mov eax, [eax]
     ret
 
 [GLOBAL write_lapic]
 type write_lapic function
 write_lapic:
-    mov     eax, [esp + 4]
-    mov     ebx, [esp + 8]
-    and     eax, 0xFFFF
-    add     eax, [lapic_base]
-    mov     [eax], ebx
+    mov eax, [esp + 4]
+    mov ebx, [esp + 8]
+    and eax, 0xFFFF
+    add eax, [lapic_base]
+    mov [eax], ebx
     ret
 
 [SECTION .data]

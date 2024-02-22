@@ -2,7 +2,7 @@
 
 volatile uint32_t global_ticks = 0;
 
-void timer_handler(int_reg_t* r) {
+void timer_handler(int_reg_t* r, core_locals_t* locals) {
     global_ticks++;
 }
 
@@ -17,11 +17,9 @@ void pit_set_freq() {
     port_outb(0x40, high);
 }
 
-uint32_t pit_init() {
+void pit_init() {
     register_int_handler(32, timer_handler);
     pit_set_freq();
-
-    return 0;
 }
 
 void sleep_no_task(uint32_t ticks) {

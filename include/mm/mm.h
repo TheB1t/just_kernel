@@ -12,4 +12,4 @@ extern symbol __kernel_start;
 extern symbol __kernel_code_start;
 extern symbol __kernel_code_end;
 
-uint32_t mm_memory_setup(multiboot_t* bootloader_info);
+void mm_memory_setup(multiboot_t* bootloader_info);

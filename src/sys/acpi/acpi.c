@@ -86,5 +86,5 @@ sdt_header_t* search_sdt_header(char* sig) {
 
 uint32_t acpi_init() {
     rsdp = get_rsdp1();
-    return 0;
+    return rsdp != (rsdp1_t*)0;
 }

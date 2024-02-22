@@ -1,3 +1,6 @@
+[BITS 32]
+[SECTION .text]
+
 [GLOBAL _cpuid]
 type _cpuid function
 _cpuid:

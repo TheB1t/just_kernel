@@ -99,10 +99,10 @@ function main() {
         sudo cp build/bin/kernel ${PXE_DIR}/ 
         ;;
     "run")
-        sudo qemu-system-x86_64 -hda ${IMAGE_FILE}.img -cpu host --enable-kvm -smp 8,sockets=2,cores=2,threads=2 -m 1024M -machine q35 -no-reboot -serial stdio
+        sudo qemu-system-x86_64 -hda ${IMAGE_FILE}.img -cpu host --enable-kvm -smp 4,sockets=1,cores=4,threads=1 -m 1024M -machine q35 -no-reboot -serial stdio
         ;;
     "run_debug")
-        sudo qemu-system-x86_64 -s -S -hda ${IMAGE_FILE}.img -machine q35 -no-reboot -serial stdio
+        sudo qemu-system-x86_64 -s -S -hda ${IMAGE_FILE}.img -cpu host --enable-kvm -smp 4,sockets=1,cores=4,threads=1 -m 1024M -machine q35 -no-reboot -serial stdio
         ;;
 	"mount")
         create_loop

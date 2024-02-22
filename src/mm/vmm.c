@@ -185,6 +185,10 @@ int vmm_unmap(void* virt, uint32_t count) {
     return vmm_unmap_pages(virt, (void*)vmm_get_base(), count);
 }
 
+void* vmm_virt_to_phys(void* virt) {
+    return virt_to_phys(virt, (void*)vmm_get_base());
+}
+
 void vmm_enable_paging() {
 	uint32_t cr0;
 	asm volatile ("mov %%cr0, %0" : "=r"(cr0));
@@ -192,7 +196,7 @@ void vmm_enable_paging() {
 	asm volatile ("mov %0, %%cr0" : : "r" (cr0));
 }
 
-void vmm_page_fault(int_reg_t* regs) {
+void vmm_page_fault(int_reg_t* regs, core_locals_t* locals) {
     uint32_t faddr;
     asm volatile ("mov %%cr2, %0" : "=r" (faddr));
 

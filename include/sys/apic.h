@@ -2,7 +2,7 @@
 
 #include <klibc/stdint.h>
 #include <sys/acpi/acpi.h>
-#include <klibc/vector.h>
+#include <klibc/plist.h>
 
 #define APIC_BASE_MSR           0x1B
 #define APIC_BASE_MSR_ENABLE    0x800
@@ -108,10 +108,16 @@ typedef enum {
     LAPIC_DCR       = 0x3E0
 } lapic_reg_t;
 
-extern vector_t cpu_vector;
-extern vector_t iso_vector;
-extern vector_t ioapic_vector;
-extern vector_t nmi_vector;
+extern plist_root_t madt_cpu;
+extern plist_root_t madt_iso;
+extern plist_root_t madt_ioapic;
+extern plist_root_t madt_nmi;
 
+extern uint32_t ioapic_read(void* ioapic_base, uint32_t addr);
+extern void     ioapic_write(void* ioapic_base, uint32_t addr, uint32_t data);
+extern uint32_t read_lapic(lapic_reg_t reg);
+extern void     write_lapic(lapic_reg_t reg, uint32_t data);
+
+void        apic_configure_ap();
 uint32_t    apic_configure();
 void        apic_EOI();

@@ -1,3 +1,6 @@
+[BITS 32]
+[SECTION .text]
+
 [GLOBAL gdt_flush]
 type gdt_flush function
 gdt_flush:

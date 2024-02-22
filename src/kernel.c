@@ -5,10 +5,12 @@
 #include <drivers/serial.h>
 #include <drivers/pit.h>
 
-#include <int/dt.h>
+#include <int/gdt.h>
+#include <int/idt.h>
 #include <int/isr.h>
 #include <sys/apic.h>
 #include <sys/pic.h>
+#include <sys/smp.h>
 
 #include <io/cpuid.h>
 
@@ -19,38 +21,40 @@
 
 #define print_mem() kprintf("free: %d kb (%d mb), used %d kb (%d mb)\n", pmm_get_free_mem() / 1024, pmm_get_free_mem() / 1024 / 1024, pmm_get_used_mem() / 1024, pmm_get_used_mem() / 1024 / 1024);
 
-void test_handler(int_reg_t* regs) {
-    kprintf("Hello from interrupt!\n");
+void test_handler(int_reg_t* regs, core_locals_t* locals) {
+    kprintf("Hello from interrupt! Core %u (in_irq %u)\n", locals->apic_id, locals->in_irq);
 }
-
-#define INIT(name, check)    {              \
-    kprintf("Initializing %s...", name);    \
-    kprintf("%s\n", !check ? "OK" : "FAIL"); \
-}                                           \
 
 int32_t kmain(multiboot_t* mboot) {
     screen_init();
+    serial_init(COM1, UART_BAUD_115200);
 
-    INIT("COM1",                serial_init(COM1, UART_BAUD_115200));
-    INIT("PIC",                 pic_remap(32, 40));
-    INIT("description tables",  dt_init());
-    INIT("memory manager",      mm_memory_setup(mboot));
-    INIT("ACPI",                acpi_init(mboot));
-    INIT("APIC",                apic_configure());
-    INIT("PIT",                 pit_init());
+    gdt_init();
 
-    kprintf("[early_screen] Hello from kernel!\n");
-    sprintf("[serial] Hello from kernel!\n");
+    mm_memory_setup(mboot);
+    acpi_init(mboot);
 
+    pic_remap(32, 40);
+    apic_configure();
+
+    init_core_locals(0);
+    idt_init();
+
+    pit_init();
     register_int_handler(0x80, test_handler);
+
+    smp_launch_cpus();
 
     asm volatile("int $0x80");
 
-    print_mem();
-    char* c = (char*)kmalloc(100 * 1024 * 1024);
-    print_mem();
-    kfree(c);
-    print_mem();
+    // -- -- -- -- -- -- TEST STUFF -- -- -- -- -- --
+    core_locals_t* locals = get_core_locals();
+    kprintf("Hello from kmain! Core %u (in_irq %u)\n", locals->apic_id, locals->in_irq);
+
+    print_mem()
+    void* ptr1 = kmalloc(0x1000000);
+    kfree(ptr1);
+    print_mem()
 
     CPUID_String_t str = {0};
     uint32_t cpuid_max = cpuid_vendor(str);
@@ -66,7 +70,7 @@ int32_t kmain(multiboot_t* mboot) {
     cpuid_string(CPUID_INTELBRANDSTRINGEND, str);
     sprintf("%s\n", str);
 
-    sleep_no_task(2000);
+    sleep_no_task(1000);
     sprintf("DONE!\n");
 
     for (;;);

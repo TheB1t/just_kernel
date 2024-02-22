@@ -1,3 +1,6 @@
+[BITS 32]
+[SECTION .text]
+
 [GLOBAL ll_find_rsdp]
 type ll_find_rsdp function
 ll_find_rsdp:
@@ -6,7 +9,7 @@ ll_find_rsdp:
 
 check_loop:
     cmp eax, edx
-    jg not_supported
+    jg  not_supported
 
     mov ebx, [eax]
     cmp ebx, 'RSD '
@@ -14,7 +17,7 @@ check_loop:
 
     mov ebx, [eax + 4]
     cmp ebx, 'PTR '
-    je supported
+    je  supported
 
 skip2:
     add eax, 4

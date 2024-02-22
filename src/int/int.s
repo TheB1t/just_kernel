@@ -1,8 +1,8 @@
-[bits 32]
-[extern isr_handler]
+[BITS 32]
+[EXTERN isr_handler]
 
 %macro isr 1
-[global isr%1]
+[GLOBAL isr%1]
 isr%1:
     cli
     push 0
@@ -11,7 +11,7 @@ isr%1:
 %endmacro
 
 %macro error_isr 1
-[global isr%1]
+[GLOBAL isr%1]
 isr%1:
     cli
     push %1
@@ -38,18 +38,21 @@ pop ebx
 pop eax
 %endmacro
 
-section .text
+[SECTION .text]
 
 isr_common:
+    mov byte [gs:4], 1
     _pushad
-    xor eax, eax
 
+    xor eax, eax
     cld
     push esp
     call isr_handler
     add esp, 4
+
     _popad
-    ; Remove the error code and interrupt number
+    mov byte [gs:4], 0
+
     add esp, 8
     iret
 

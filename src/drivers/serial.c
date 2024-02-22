@@ -1,15 +1,19 @@
 #include <drivers/serial.h>
+#include <klibc/lock.h>
 
+lock_t sprintf_lock;
 uint16_t _active_port = 0;
 
 void sprintf(const char* format, ...) {
 	if (!_active_port)
 		return;
 
+	lock(sprintf_lock);
     va_list va;
     va_start(va, format);
     _vprintf(serial_writeChar, format, va);
     va_end(va);
+	unlock(sprintf_lock);	
 }
 
 int32_t serial_init(uint16_t port, uint16_t baud) {

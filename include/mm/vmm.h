@@ -31,7 +31,7 @@ int         vmm_map_pages(void* phys, void* virt, void* ptr, uint32_t count, uin
 int         vmm_remap_pages(void* phys, void* virt, void* ptr, uint32_t count, uint16_t perms);
 int         vmm_unmap_pages(void* virt, void* ptr, uint32_t count);
 void        vmm_set_base(uint32_t new);
-void*       virt_to_phys(void* virt, vmm_table_t* dir);
+void*       vmm_virt_to_phys(void* virt);
 uint8_t     is_mapped(void* data);
 uint8_t     range_mapped(void* data, uint32_t size);
 uint32_t    vmm_get_base();

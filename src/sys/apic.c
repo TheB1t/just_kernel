@@ -2,23 +2,14 @@
 #include <sys/pic.h>
 #include <io/ports.h>
 #include <mm/vmm.h>
-#include <klibc/vector.h>
 #include <drivers/serial.h>
 #include <io/msr.h>
 
 extern uint32_t lapic_base;
-vector_t cpu_vector;
-vector_t iso_vector;
-vector_t ioapic_vector;
-vector_t nmi_vector;
-
-uint8_t cpu_count = 0;
-
-extern uint32_t ioapic_read(void* ioapic_base, uint32_t addr);
-extern void ioapic_write(void* ioapic_base, uint32_t addr, uint32_t data);
-extern uint32_t read_lapic(lapic_reg_t reg);
-extern void write_lapic(lapic_reg_t reg, uint32_t data);
-
+plist_root_t madt_cpu;
+plist_root_t madt_iso;
+plist_root_t madt_ioapic;
+plist_root_t madt_nmi;
 
 uint32_t parse_madt() {
     madt_t *madt = (madt_t *)search_sdt_header("APIC");
@@ -29,12 +20,13 @@ uint32_t parse_madt() {
     }
 
     sprintf("[MADT] Found MADT 0x%08x\n", madt);
-    vector_init(&cpu_vector);
-    vector_init(&iso_vector);
-    vector_init(&ioapic_vector);
-    vector_init(&nmi_vector);
     uint32_t bytes_for_entries = madt->header.length - (sizeof(madt->header) + sizeof(madt->local_apic_addr) + sizeof(madt->apic_flags));
     lapic_base = madt->local_apic_addr;
+
+    plist_init(&madt_cpu);
+    plist_init(&madt_iso);
+    plist_init(&madt_ioapic);
+    plist_init(&madt_nmi);
 
     sprintf("[MADT] MADT entries:\n");
     for (uint32_t e = 0; e < bytes_for_entries; e++) {
@@ -45,12 +37,14 @@ uint32_t parse_madt() {
             case 0: {
                 madt_ent0_t* ent = (madt_ent0_t*)&(madt->entries[e]);
                 sprintf("   LAPIC: ACPI ID %3d, APIC ID %3d, flags 0x%08x\n", ent->acpi_processor_id, ent->apic_id, ent->cpu_flags);
-                vector_add(&cpu_vector, (void*)ent);
+                plist_node_t* node = plist_alloc_node((void*)ent);
+                plist_add(&madt_cpu, node);
             } break;
             case 1: {
                 madt_ent1_t* ent = (madt_ent1_t*)&(madt->entries[e]);
                 sprintf("   IOAPIC: id %3d, addr 0x%08x, GSI Base 0x%08x\n", ent->ioapic_id, ent->ioapic_addr, ent->gsi_base);
-                vector_add(&ioapic_vector, (void*)ent);
+                plist_node_t* node = plist_alloc_node((void*)ent);
+                plist_add(&madt_ioapic, node);
 
                 /* Map the IOAPICs into virtual memory */
                 vmm_map((void*)ent->ioapic_addr, (void*)ent->ioapic_addr, 2, VMM_PRESENT | VMM_WRITE);
@@ -58,12 +52,14 @@ uint32_t parse_madt() {
             case 2: {
                 madt_ent2_t* ent = (madt_ent2_t*)&(madt->entries[e]);
                 sprintf("   ISO: bus %3d, IRQ %3d, GSI %3d, flags 0x%08x\n", ent->bus_src, ent->gsi, ent->flags);
-                vector_add(&iso_vector, (void*)ent);
+                plist_node_t* node = plist_alloc_node((void*)ent);
+                plist_add(&madt_iso, node);
             } break;
             case 4: {
                 madt_ent4_t* ent = (madt_ent4_t*)&(madt->entries[e]);
                 sprintf("   NMI: Processor ID %3d, LINT %3d, Flags %3d\n", ent->acpi_processor_id, ent->lint, ent->flags);
-                vector_add(&nmi_vector, (void *)ent);
+                plist_node_t* node = plist_alloc_node((void*)ent);
+                plist_add(&madt_nmi, node);
             } break;
             case 5: {
                 madt_ent5_t* ent = (madt_ent5_t*)&(madt->entries[e]);
@@ -79,7 +75,7 @@ uint32_t parse_madt() {
     }
 
     sprintf("[APIC] LAPIC addr: 0x%08x\n", lapic_base);
-    sprintf("[APIC] CPUs: %u, ISOs: %u, IOAPICs: %u, NMIs: %u\n", cpu_vector.items_count, iso_vector.items_count, ioapic_vector.items_count, nmi_vector.items_count);
+    sprintf("[APIC] CPUs: %u, ISOs: %u, IOAPICs: %u, NMIs: %u\n", plist_size(&madt_cpu), plist_size(&madt_iso), plist_size(&madt_ioapic), plist_size(&madt_nmi));
 
     vmm_map((void*)lapic_base, (void*)lapic_base, 2, VMM_PRESENT | VMM_WRITE);
 
@@ -97,9 +93,9 @@ uint8_t apic_get_gsi_max(madt_ent1_t* ioapic) {
 madt_ent1_t* apic_find_valid_ioapic(uint32_t gsi) {
     madt_ent1_t* valid_ioapic = (madt_ent1_t*)0;
 
-    madt_ent1_t** ioapics = (madt_ent1_t**)vector_items(&ioapic_vector);
-    for (uint32_t i = 0; i < ioapic_vector.items_count; i++) {
-        madt_ent1_t* ioapic = ioapics[i];
+    struct list_head* iter0;
+    list_for_each(iter0, LIST_GET_HEAD(&madt_ioapic)) {
+        madt_ent1_t* ioapic = (madt_ent1_t*)plist_get(iter0);
         uint32_t gsi_max = (uint32_t)apic_get_gsi_max(ioapic) + ioapic->gsi_base;
 
         if (ioapic->gsi_base <= gsi && gsi_max >= gsi)
@@ -155,7 +151,7 @@ void redirect_gsi(madt_ent1_t* ioapic, uint8_t irq, uint32_t gsi, uint16_t flags
 }
 
 void apic_configure_ap() {
-    write_msr(APIC_BASE_MSR, (read_msr(APIC_BASE_MSR) | APIC_BASE_MSR_ENABLE) & ~(1<<10));
+    write_msr(APIC_BASE_MSR, (read_msr(APIC_BASE_MSR) | APIC_BASE_MSR_ENABLE) & ~(1 << 10));
     write_lapic(LAPIC_SIVR, read_lapic(LAPIC_SIVR) | 0x1FF);
 }
 
@@ -167,12 +163,11 @@ uint32_t apic_configure() {
 
     apic_configure_ap();
 
-    madt_ent1_t** ioapics = (madt_ent1_t**)vector_items(&ioapic_vector);
-    madt_ent2_t** isos = (madt_ent2_t**)vector_items(&iso_vector);
     uint8_t mapped_irqs[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-    for (uint32_t i = 0; i < ioapic_vector.items_count; i++) {
-        madt_ent1_t* ioapic = ioapics[i];
+    struct list_head* iter0;
+    list_for_each(iter0, LIST_GET_HEAD(&madt_ioapic)) {
+        madt_ent1_t* ioapic = (madt_ent1_t*)plist_get(iter0);
 
         sprintf("[APIC][IOAPIC#%u] Masked GSI's {", ioapic->ioapic_id);
         for (uint32_t gsi = ioapic->gsi_base; gsi < apic_get_gsi_max(ioapic); gsi++) {
@@ -184,8 +179,10 @@ uint32_t apic_configure() {
         uint32_t gsi_max = (uint32_t)apic_get_gsi_max(ioapic) + ioapic->gsi_base;
 
         sprintf("[APIC][IOAPIC#%u] Mapped ISO to GSI's {\n", ioapic->ioapic_id);
-        for (uint32_t i = 0; i < iso_vector.items_count; i++) {
-            madt_ent2_t* iso = isos[i];
+
+        struct list_head* iter1;
+        list_for_each(iter1, LIST_GET_HEAD(&madt_iso)) {
+            madt_ent2_t* iso = (madt_ent2_t*)plist_get(iter1);
 
             if (ioapic->gsi_base <= iso->gsi && gsi_max >= iso->gsi) {
                 redirect_gsi(ioapic, iso->irq_src, iso->gsi, iso->flags, 0);

@@ -14,5 +14,4 @@
 void*   kmalloc(uint32_t size);
 void    kfree(void *addr);
 void*   kcalloc(uint32_t size);
-void*   krealloc(void *addr, uint32_t new_size);
 void    panic(char* msg);

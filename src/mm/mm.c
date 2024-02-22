@@ -1,10 +1,13 @@
 #include <mm/mm.h>
 #include <mm/pmm.h>
 #include <mm/vmm.h>
+#include <mm/heap.h>
 
 extern symbol stack;
+Heap_t  _kernel_heap_base;
+Heap_t* kernel_heap;
 
-uint32_t mm_memory_setup(multiboot_t* bootloader_info) {
+void mm_memory_setup(multiboot_t* bootloader_info) {
     if (!(bootloader_info->flags & MULTIBOOT_FLAG_MMAP))
         panic("Bootloader can't store memory map!\n");
 
@@ -55,5 +58,5 @@ uint32_t mm_memory_setup(multiboot_t* bootloader_info) {
 
     vmm_memory_setup(kernel_start, kernel_len + PAGE_SIZE);
 
-    return 0;
+    kernel_heap = createHeap((uint32_t)&_kernel_heap_base, HEAP_START, HEAP_MIN_SIZE, 0xCFFFF000, VMM_WRITE);
 }

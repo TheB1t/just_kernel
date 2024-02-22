@@ -1,3 +1,6 @@
+[BITS 32]
+[SECTION .text]
+
 [GLOBAL read_msr]
 type read_msr function
 read_msr:

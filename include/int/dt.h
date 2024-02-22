@@ -13,5 +13,3 @@
 #define DESC_USER_DATA		4
 
 #define DESC_SEG(n, cpl)	(uint32_t)(((uint32_t)0x8 * (uint32_t)n) | (uint32_t)cpl)
-
-uint32_t dt_init();
