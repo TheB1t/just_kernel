@@ -13,6 +13,16 @@ void strcpy(char *src, char *dst) {
     *dst = '\0';
 }
 
+void strncpy(char *src, char *dst, int max) {
+    uint32_t len = strlen(src) + 1;
+    len = len > max ? max : len;
+
+    for (uint32_t i = 0; i < len; i++)
+        *dst++ = *src++;
+
+    *dst = '\0';
+}
+
 int strcmp(char *s1, char *s2) {
     if (strlen(s1) != strlen(s2)) return 1;
     while (*s1 != '\0' && *s2 != '\0') {

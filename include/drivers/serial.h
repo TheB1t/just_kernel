@@ -44,6 +44,7 @@
 #define COM8 0x4E8
 
 void		sprintf(const char* format, ...);
+void		isprintf(const char* format, ...);
 
 int32_t		serial_init(uint16_t port, uint16_t baud);
 char		serial_readChar();

@@ -4,26 +4,7 @@
 #include <int/dt.h>
 #include <sys/smp.h>
 
-typedef struct {
-    uint32_t    esi;
-    uint32_t    edi;
-    uint32_t    ebp;
-    uint32_t    edx;
-    uint32_t    ecx;
-    uint32_t    ebx;
-    uint32_t    eax;
-
-    uint32_t    int_num;
-    uint32_t    int_err;
-
-    uint32_t    rip;
-    uint32_t    cs;
-    uint32_t    rflags;
-    uint32_t    esp;
-    uint32_t    ss;
-} __attribute__((packed)) int_reg_t;
-
-typedef void (*int_handler_t) (int_reg_t*, core_locals_t*);
+typedef void (*int_handler_t) (core_locals_t*);
 
 void register_int_handler(uint8_t n, int_handler_t handler);
 

@@ -77,7 +77,7 @@ function main() {
         sudo rm ${MOUNT_DIR}/boot/grub/grub.cfg
         sudo cp ${GRUB_CFG_PATH} ${MOUNT_DIR}/boot/grub/
         
-        cmake -B build .
+        cmake -B build . -DCMAKE_BUILD_TYPE=Debug
         make -C build
 
         sudo rm ${MOUNT_DIR}/kernel
@@ -99,10 +99,10 @@ function main() {
         sudo cp build/bin/kernel ${PXE_DIR}/ 
         ;;
     "run")
-        sudo qemu-system-x86_64 -hda ${IMAGE_FILE}.img -cpu host --enable-kvm -smp 4,sockets=1,cores=4,threads=1 -m 1024M -machine q35 -no-reboot -serial stdio
+        sudo qemu-system-x86_64 -hda ${IMAGE_FILE}.img -smp 8,sockets=1,cores=8,threads=1 -m 1024M -machine q35 -no-reboot -serial stdio
         ;;
     "run_debug")
-        sudo qemu-system-x86_64 -s -S -hda ${IMAGE_FILE}.img -cpu host --enable-kvm -smp 4,sockets=1,cores=4,threads=1 -m 1024M -machine q35 -no-reboot -serial stdio
+        sudo qemu-system-x86_64 -s -S -hda ${IMAGE_FILE}.img -smp 8,sockets=1,cores=8,threads=1 -m 1024M -machine q35 -no-reboot -serial stdio
         ;;
 	"mount")
         create_loop
@@ -111,6 +111,14 @@ function main() {
     "umount")
         umount_loop
         remove_loop
+        ;;
+    "a2l")
+        local addr=$1
+        addr2line -e build/bin/kernel ${addr}
+        ;;
+    "burn")
+        local drive=$1
+        sudo dd if=${IMAGE_FILE}.img of=${drive} status=progress
         ;;
 	*)
 	    [[ -n "$action" ]] && echo "Not implemented action $1" || echo "Action not passed"

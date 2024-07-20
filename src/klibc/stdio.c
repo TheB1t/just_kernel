@@ -1,7 +1,7 @@
 #include <klibc/stdio.h>
 #include <klibc/lock.h>
 
-lock_t kprintf_lock;
+lock_t kprintf_lock	= INIT_LOCK(kprintf_lock);
 printf_putchar_t _global_putchar = NULL;
 
 void kprintf(const char* format, ...) {

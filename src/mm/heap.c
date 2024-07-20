@@ -111,7 +111,7 @@ static void removeChunk(HeapChunk_t* chunk) {
 	__list_del_entry(&(chunk->list));	
 }
 
-Heap_t* createHeap(uint32_t placementAddr, uint32_t start, uint32_t size, uint32_t max, uint16_t perms) {
+Heap_t* createHeap(uint32_t placementAddr, uint32_t cr3, uint32_t start, uint32_t size, uint32_t max, uint16_t perms) {
 	Heap_t* heap = (Heap_t*)placementAddr;
 
 	uint32_t end = start + size;
@@ -122,10 +122,11 @@ Heap_t* createHeap(uint32_t placementAddr, uint32_t start, uint32_t size, uint32
 	heap->endAddr		= end;
 	heap->maxAddr		= max;
 	heap->perms			= perms;
+	heap->cr3			= cr3;
 	INIT_LIST_HEAD(get_head(heap));
 
 	void* phys = pmm_alloc(size);
-	vmm_map(phys, (void*)start, size / PAGE_SIZE, heap->perms | VMM_PRESENT);
+	vmm_map_pages(phys, (void*)start, (void*)heap->cr3, size / PAGE_SIZE, heap->perms | VMM_PRESENT);
 
 	HeapChunk_t* hole = (HeapChunk_t*)start;
 	hole->prevFoot = 0;
@@ -169,12 +170,12 @@ static size_t contract(size_t newSize, Heap_t* heap) {
     heap->endAddr = heap->startAddr + newSize;
 
     size_t size = oldEnd - heap->endAddr;
-    if (!is_mapped((void*)heap->endAddr))
+    if (!is_mapped((void*)heap->endAddr, (void*)heap->cr3))
         sprintf("[heap] trying to free unmapped memory! addr: 0x%08x\n", heap->endAddr);
 
-    vmm_unmap((void*)heap->endAddr, size / PAGE_SIZE);
+    vmm_unmap_pages((void*)heap->endAddr, (void*)heap->cr3, size / PAGE_SIZE);
 	
-    void* phys = vmm_virt_to_phys((void*)heap->endAddr);
+    void* phys = virt_to_phys((void*)heap->endAddr, (void*)heap->cr3);
     if ((uint32_t)phys != 0xFFFFFFFF)
         pmm_unalloc(phys, size);
 

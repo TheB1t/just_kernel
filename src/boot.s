@@ -37,7 +37,7 @@ section .text
 type start function
 start:
   xor ebp, ebp
-  mov esp, stack
+  mov esp, stack.top
 
   push ebx
   ; Enable SSE

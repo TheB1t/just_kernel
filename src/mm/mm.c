@@ -58,5 +58,5 @@ void mm_memory_setup(multiboot_t* bootloader_info) {
 
     vmm_memory_setup(kernel_start, kernel_len + PAGE_SIZE);
 
-    kernel_heap = createHeap((uint32_t)&_kernel_heap_base, HEAP_START, HEAP_MIN_SIZE, 0xCFFFF000, VMM_WRITE);
+    kernel_heap = createHeap((uint32_t)&_kernel_heap_base, vmm_get_base(), 0x01000000, HEAP_MIN_SIZE, 0x02000000, VMM_WRITE);
 }

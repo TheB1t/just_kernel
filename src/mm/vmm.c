@@ -1,5 +1,8 @@
 #include <mm/vmm.h>
 #include <mm/pmm.h>
+#include <klibc/lock.h>
+
+lock_t vmm_lock = INIT_LOCK(vmm_lock);
 
 uint32_t base_kernel_cr3 = 0;
 
@@ -67,16 +70,13 @@ void vmm_ensure_table(vmm_table_t* table, uint16_t offset) {
     if (!(table->entries[offset] & VMM_PRESENT)) {
         uint32_t new_table = (uint32_t)pmm_alloc(PAGE_SIZE);
 
-        if (!is_mapped((void*)new_table))
-            vmm_map((void*)new_table, (void*)new_table, 1, VMM_PRESENT | VMM_WRITE | VMM_USER);
-
         memset((uint8_t*)new_table, 0, PAGE_SIZE);
         table->entries[offset] = new_table | VMM_PRESENT | VMM_WRITE | VMM_USER;
     }
 }
 
-uint8_t is_mapped(void* data) {
-    uint32_t phys_addr = (uint32_t)virt_to_phys(data, (void*)vmm_get_base());
+uint8_t is_mapped(void* data, void* cr3) {
+    uint32_t phys_addr = (uint32_t)virt_to_phys(data, (vmm_table_t*)cr3);
 
     return phys_addr == 0xFFFFFFFF ? 0 : 1;
 }
@@ -86,13 +86,13 @@ uint8_t range_mapped(void* data, uint32_t size) {
     uint32_t addr_not_rounded = (uint32_t) data;
     uint32_t end_addr = (addr_not_rounded + size) & ~(0xfff);
     uint32_t rounded_size = end_addr - cur_addr;
-    uint32_t pages = ((rounded_size + 0x1000 - 1) / 0x1000);
+    uint32_t pages = ((rounded_size + PAGE_SIZE - 1) / PAGE_SIZE);
 
     for (uint32_t i = 0; i < pages; i++) {
-        if (!is_mapped((void*) cur_addr))
+        if (!is_mapped((void*) cur_addr, (vmm_table_t*)vmm_get_base()))
             return 0;
 
-        cur_addr += 0x1000;
+        cur_addr += PAGE_SIZE;
     }
 
     return 1;
@@ -103,9 +103,13 @@ vmm_table_t* vmm_get_table(vmm_table_off_t* offs, vmm_table_t* table) {
     return traverse_table(table, offs->p0_off);
 }
 
-int vmm_map_pages(void* phys, void* virt, void* ptr, uint32_t count, uint16_t perms) {
+int vmm_map_pages(void* phys, void* virt, void* cr3, uint32_t count, uint16_t perms) {
+    interrupt_state_t state = interrupt_lock();
+
+    lock(vmm_lock);
+
     int ret = 0;
-    vmm_table_t* table0 = (vmm_table_t*)ptr;
+    vmm_table_t* table0 = (vmm_table_t*)cr3;
 
     uint8_t* cur_virt = (uint8_t *) (((uint32_t)virt) & VMM_4K_PERM_MASK);
     uint32_t cur_phys = ((uint32_t) phys) & VMM_4K_PERM_MASK;
@@ -117,22 +121,28 @@ int vmm_map_pages(void* phys, void* virt, void* ptr, uint32_t count, uint16_t pe
         if (!(table1->entries[offs.p1_off] & VMM_PRESENT)) {
             table1->entries[offs.p1_off] = cur_phys | perms;
             vmm_invlpg((uint32_t)cur_virt);
-            cur_phys += 0x1000;
-            cur_virt += 0x1000;
+            cur_phys += PAGE_SIZE;
+            cur_virt += PAGE_SIZE;
         } else {
             ret = 1;
-            cur_phys += 0x1000;
-            cur_virt += 0x1000;
+            cur_phys += PAGE_SIZE;
+            cur_virt += PAGE_SIZE;
             continue;
         }
     }
 
+    unlock(vmm_lock);
+    interrupt_unlock(state);
+
     return ret;
 }
 
-int vmm_remap_pages(void* phys, void* virt, void* ptr, uint32_t count, uint16_t perms) {
+int vmm_remap_pages(void* phys, void* virt, void* cr3, uint32_t count, uint16_t perms) {
+    interrupt_state_t state = interrupt_lock();
+    lock(vmm_lock);
+
     int ret = 0;
-    vmm_table_t* table0 = (vmm_table_t*)ptr;
+    vmm_table_t* table0 = (vmm_table_t*)cr3;
 
     uint8_t *cur_virt = (uint8_t *) (((uint32_t) virt) & VMM_4K_PERM_MASK);
     uint32_t cur_phys = ((uint32_t) phys) & VMM_4K_PERM_MASK;
@@ -144,16 +154,22 @@ int vmm_remap_pages(void* phys, void* virt, void* ptr, uint32_t count, uint16_t 
         table1->entries[offs.p1_off] = cur_phys | (perms | VMM_PRESENT);
 
         vmm_invlpg((uint32_t)cur_virt);
-        cur_phys += 0x1000;
-        cur_virt += 0x1000;
+        cur_phys += PAGE_SIZE;
+        cur_virt += PAGE_SIZE;
     }
+
+    unlock(vmm_lock);
+    interrupt_unlock(state);
 
     return ret;
 }
 
-int vmm_unmap_pages(void* virt, void* ptr, uint32_t count) {
+int vmm_unmap_pages(void* virt, void* cr3, uint32_t count) {
+    interrupt_state_t state = interrupt_lock();
+    lock(vmm_lock);
+
     int ret = 0;
-    vmm_table_t* table0 = (vmm_table_t*)ptr;
+    vmm_table_t* table0 = (vmm_table_t*)cr3;
     uint32_t cur_virt = (uint32_t)virt;
 
     for (uint32_t page = 0; page < count; page++) {
@@ -167,8 +183,11 @@ int vmm_unmap_pages(void* virt, void* ptr, uint32_t count) {
         }
 
         vmm_invlpg(cur_virt);
-        cur_virt += 0x1000;
+        cur_virt += PAGE_SIZE;
     }
+
+    unlock(vmm_lock);
+    interrupt_unlock(state);
 
     return ret;
 }
@@ -196,7 +215,9 @@ void vmm_enable_paging() {
 	asm volatile ("mov %0, %%cr0" : : "r" (cr0));
 }
 
-void vmm_page_fault(int_reg_t* regs, core_locals_t* locals) {
+void vmm_page_fault(core_locals_t* locals) {
+    core_regs_t* regs = &locals->irq_regs;
+
     uint32_t faddr;
     asm volatile ("mov %%cr2, %0" : "=r" (faddr));
 
@@ -212,8 +233,15 @@ void vmm_page_fault(int_reg_t* regs, core_locals_t* locals) {
     	err = "Overwrite CPU-reserved bits";
     }
 
-    sprintf("Page fault at 0x%08x (%s)\n", faddr, err);
-    panic("Page fault");
+    thread_t* thread = locals->current_thread;
+    thread->state = THREAD_TERMINATED;
+
+    isprintf("Page fault at 0x%08x (0x%08x, %s) on core %u (tid %d, in_irq %u)\n", regs->eip, faddr, err, locals->core_index, thread ? thread->tid : -1, locals->in_irq);
+    // print_stacktrace(&locals->irq_regs);
+    asm volatile("sti");
+
+    while (1)
+        asm volatile("hlt");
 }
 
 void vmm_memory_setup(uint32_t kernel_start, uint32_t kernel_len) {
@@ -231,4 +259,22 @@ void vmm_memory_setup(uint32_t kernel_start, uint32_t kernel_len) {
     vmm_enable_paging();
 
     base_kernel_cr3 = vmm_get_base();
+}
+
+void* vmm_fork_kernel_space(void* cr3) {
+    interrupt_state_t state = interrupt_lock();
+    lock(vmm_lock);
+
+    vmm_table_t* table0old = (vmm_table_t*)cr3;
+    vmm_table_t* table0new = (vmm_table_t*)pmm_alloc(PAGE_SIZE);
+
+    memset((uint8_t*)table0new, 0, PAGE_SIZE);
+
+    for (uint32_t i = 0; i < 8; i++)
+        table0new->entries[i] = table0old->entries[i];
+
+    unlock(vmm_lock);
+    interrupt_unlock(state);
+
+    return (void*)table0new;
 }

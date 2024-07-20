@@ -1,10 +1,13 @@
 #include <drivers/pit.h>
 #include <sys/smp.h>
 #include <sys/apic.h>
+
+#include <sys/tss.h>
 #include <int/gdt.h>
 #include <int/idt.h>
 #include <io/msr.h>
 #include <mm/vmm.h>
+#include <proc/sched.h>
 
 SMPBootInfo_t* smp_info_ptr = (SMPBootInfo_t*)0x500;
 uint8_t smp_boot_counter    = 1;
@@ -16,7 +19,10 @@ extern char smp_loaded[];
 
 void init_core_locals(uint8_t id) {
     core_locals_t* locals   = kcalloc(sizeof(core_locals_t));
+    memset((uint8_t*)locals, 0, sizeof(core_locals_t));
+    locals->state           = CORE_OFFLINE;
     locals->meta_pointer    = (uint32_t)locals;
+    locals->irq_stack       = (uint32_t)(kmalloc(PAGE_SIZE) + PAGE_SIZE);
     locals->apic_id         = smp_get_lapic_id();
     locals->core_index      = id;
     write_msr(0xC0000101, (uint32_t)locals);
@@ -37,10 +43,26 @@ void smp_send_ipi(uint8_t ap, uint32_t ipi_number) {
     write_lapic(0x300, ipi_number);
 }
 
+void smp_send_global_ipi(uint32_t ipi_number) {
+    struct list_head* iter0;
+    list_for_each(iter0, LIST_GET_HEAD(&madt_cpu)) {
+        madt_ent0_t* cpu = (madt_ent0_t*)plist_get(iter0);
+
+        if (cpu->apic_id != smp_get_lapic_id())
+            smp_send_ipi(cpu->apic_id, ipi_number);
+    }
+}
+
+void smp_send_global_interrupt(uint8_t int_num) {
+    smp_send_global_ipi((1 << 14) | int_num);
+}
+
 void smp_launch_cpus() {
+    get_core_locals()->state = CORE_ONLINE;
+
     uint32_t code_size = smp_trampoline_end - smp_trampoline;
 
-    if (code_size > 0x1000) {
+    if (code_size > PAGE_SIZE) {
         sprintf("[SMP] Trampoline code size is too big (> 4096 bytes)");
     }
 
@@ -110,11 +132,16 @@ void smp_entry_point(SMPBootInfo_t* info) {
     apic_configure_ap();
 
     init_core_locals(info->id);
+    sched_init_core();
+    tss_init();
     idt_init();
 
     asm volatile("int $0x80");
 
     info->status = 3;
+
+    get_core_locals()->state = CORE_ONLINE;
+
     while (1) {
         asm volatile("hlt");
     }

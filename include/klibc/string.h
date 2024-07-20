@@ -6,6 +6,7 @@
 /* String manipulation functions */
 void        reverse(char s[]);
 void        strcpy(char *src, char *dst);
+void        strncpy(char *src, char *dst, int max);
 int         strcmp(char *s1, char *s2);
 int         strncmp(char *s1, char *s2, int len);
 void        strcat(char *dst, char *src);

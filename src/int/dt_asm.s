@@ -30,6 +30,5 @@ type tss_flush function
 tss_flush:
 	xor eax, eax
 	mov eax, [esp + 4]
-	or ax, 3
 	ltr ax
 	ret

@@ -1,9 +1,9 @@
 #include <klibc/lock.h>
 
 interrupt_state_t check_interrupts() {
-    uint32_t rflags;
-    asm volatile("pushf; pop %%eax; mov %%eax, %0;" : "=r"(rflags) :: "eax");
-    uint8_t int_flag = (uint8_t)((rflags & (0x200)) >> 9);
+    uint32_t eflags;
+    asm volatile("pushf; pop %%eax; mov %%eax, %0;" : "=r"(eflags) :: "eax");
+    uint8_t int_flag = (uint8_t)((eflags & (0x200)) >> 9);
     return (interrupt_state_t)int_flag;
 }
 

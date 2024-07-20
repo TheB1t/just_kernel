@@ -3,8 +3,11 @@
 #include <sys/smp.h>
 #include <io/ports.h>
 
-#define SET_GATE(num, func) idt_set_gate(num, (uint32_t)func, DESC_SEG(DESC_KERNEL_CODE, PL_RING0), pack_flags(0b1, 0b00))
-#define SET_GATE_ISR(num) SET_GATE(num, isr##num)
+#define shift(v, n)				((v) << (n))
+#define pack_flags(T, DPL, P)	(0x00 | shift(T & 0b1111, 0) | shift(DPL & 0b11, 5) | shift(P & 0b1, 7))
+
+#define SET_GATE(num, func)		idt_set_gate(num, (uint32_t)func, DESC_SEG(DESC_KERNEL_CODE, PL_RING0), pack_flags(0xE, PL_RING0, 0b1))
+#define SET_GATE_ISR(num)		SET_GATE(num, isr##num)
 
 extern void idt_flush(uint32_t);
 extern int_handler_t handlers[IDT_ENTRIES];

@@ -145,7 +145,7 @@ static inline void list_move_tail(struct list_head *list,
 */
 static inline int list_empty(struct list_head *head)
 {
-    return head->next == head;
+    return head->next == head || head->next == (void*)0;
 }
 
 /**

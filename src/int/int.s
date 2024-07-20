@@ -3,6 +3,7 @@
 
 %macro isr 1
 [GLOBAL isr%1]
+type isr%1 function
 isr%1:
     cli
     push 0
@@ -12,48 +13,125 @@ isr%1:
 
 %macro error_isr 1
 [GLOBAL isr%1]
+type isr%1 function
 isr%1:
     cli
     push %1
     jmp isr_common
 %endmacro
 
-%macro _pushad 0
-push eax
-push ebx
-push ecx
-push edx
-push ebp
-push edi
-push esi
+struc IRQ_REGS
+	._esp:      resd 1
+    ._ss:       resd 1
+    ._ds:       resd 1
+    ._cr3:      resd 1
+    ._esi:      resd 1
+    ._edi:      resd 1
+    ._ebp:      resd 1
+    ._edx:      resd 1
+    ._ecx:      resd 1
+    ._ebx:      resd 1
+    ._eax:      resd 1
+
+    ._int_num:  resd 1
+    ._int_err:  resd 1
+
+    ._eip:      resd 1
+    ._cs:       resd 1
+    ._eflags:   resd 1
+
+    ._esp0:     resd 1
+    ._ss0:      resd 1
+endstruc
+
+%macro save_reg 1
+    mov dword [gs : 12 + IRQ_REGS._%1], %1
 %endmacro
 
-%macro _popad 0
-pop esi
-pop edi
-pop ebp
-pop edx
-pop ecx
-pop ebx
-pop eax
+%macro load_reg 1
+    mov %1, dword [gs : 12 + IRQ_REGS._%1]
+%endmacro
+
+%macro save_reg_stack 1
+    pop eax
+    mov dword [gs : 12 + IRQ_REGS._%1], eax
+%endmacro
+
+%macro load_reg_stack 1
+    mov eax, dword [gs : 12 + IRQ_REGS._%1]
+    push eax
+%endmacro
+
+%macro save_regs 0
+    save_reg eax
+    save_reg ebx
+    save_reg ecx
+    save_reg edx
+    save_reg ebp
+    save_reg edi
+    save_reg esi
+
+    save_reg_stack int_num
+    save_reg_stack int_err
+
+    save_reg_stack eip
+    save_reg_stack cs
+    save_reg_stack eflags
+
+    test dword [gs : 12 + IRQ_REGS._cs], 3
+    jz .kernel_space_save
+
+    save_reg_stack esp0
+    save_reg_stack ss0
+
+.kernel_space_save:
+
+    ; mov eax, cr3
+    ; mov dword [gs : 12 + IRQ_REGS._cr3], eax
+
+    save_reg esp
+%endmacro
+
+%macro load_regs 0
+    load_reg esp
+
+    ; mov eax, dword [gs : 12 + IRQ_REGS._cr3]
+    ; mov cr3, eax
+
+    test dword [gs : 12 + IRQ_REGS._cs], 3
+    jz .kernel_space_load
+
+    load_reg_stack ss0
+    load_reg_stack esp0
+
+.kernel_space_load:
+
+    load_reg_stack eflags
+    load_reg_stack cs
+    load_reg_stack eip
+
+    load_reg esi
+    load_reg edi
+    load_reg ebp
+    load_reg edx
+    load_reg ecx
+    load_reg ebx
+    load_reg eax
 %endmacro
 
 [SECTION .text]
 
+type isr_common function
 isr_common:
     mov byte [gs:4], 1
-    _pushad
+    save_regs
 
-    xor eax, eax
     cld
-    push esp
     call isr_handler
-    add esp, 4
 
-    _popad
+    load_regs
     mov byte [gs:4], 0
 
-    add esp, 8
     iret
 
 isr 0

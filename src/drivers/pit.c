@@ -1,9 +1,13 @@
 #include <drivers/pit.h>
+#include <proc/sched.h>
 
 volatile uint32_t global_ticks = 0;
 
-void timer_handler(int_reg_t* r, core_locals_t* locals) {
+void timer_handler(core_locals_t* locals) {
     global_ticks++;
+
+    if (global_ticks % (8) == 0)
+        _sched_all(locals);
 }
 
 void pit_set_freq() {
