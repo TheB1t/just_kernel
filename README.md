@@ -1,10 +1,10 @@
-# µOS kernel
+# Just kernel
 
 __Version:__ 0.1
 
 ### About
 
-A hybrid kernel for µOS
+A hybrid kernel
 
 ### What tools i using for development
 
