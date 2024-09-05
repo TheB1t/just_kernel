@@ -1,4 +1,5 @@
 #include <proc/thread.h>
+#include <proc/sched.h>
 #include <int/dt.h>
 #include <mm/pmm.h>
 #include <mm/vmm.h>
@@ -24,7 +25,6 @@ thread_regs_t default_user_regs = {
 };
 
 extern symbol load_thread;
-extern symbol load_thread_end;
 
 thread_t* thread_create(process_t* proc, void* entry) {
     sched_lock();

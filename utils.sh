@@ -76,7 +76,7 @@ function main() {
 
         sudo rm ${MOUNT_DIR}/boot/grub/grub.cfg
         sudo cp ${GRUB_CFG_PATH} ${MOUNT_DIR}/boot/grub/
-        
+
         cmake -B build . -DCMAKE_BUILD_TYPE=Debug
         make -C build
 
@@ -96,13 +96,13 @@ function main() {
 
         sudo rm ${PXE_DIR}/kernel
 
-        sudo cp build/bin/kernel ${PXE_DIR}/ 
+        sudo cp build/bin/kernel ${PXE_DIR}/
         ;;
     "run")
-        sudo qemu-system-x86_64 -hda ${IMAGE_FILE}.img -smp 8,sockets=1,cores=8,threads=1 -m 1024M -machine q35 -no-reboot -serial stdio
+        sudo qemu-system-x86_64 -hda ${IMAGE_FILE}.img -smp 8,sockets=1,cores=8,threads=1 -m 1024M -machine q35 -no-reboot -no-shutdown -serial stdio
         ;;
     "run_debug")
-        sudo qemu-system-x86_64 -s -S -hda ${IMAGE_FILE}.img -smp 8,sockets=1,cores=8,threads=1 -m 1024M -machine q35 -no-reboot -serial stdio
+        sudo qemu-system-x86_64 -s -S -hda ${IMAGE_FILE}.img -smp 8,sockets=1,cores=8,threads=1 -m 1024M -machine q35 -no-reboot -no-shutdown -serial stdio
         ;;
 	"mount")
         create_loop
@@ -125,7 +125,7 @@ function main() {
 	    echo "Avaliable actions:"
 	    echo "	pack                : packing kernel"
 	    echo "	mount               : mount image"
-	    echo "	umount              : umount image"	    
+	    echo "	umount              : umount image"
         ;;
 	esac
 

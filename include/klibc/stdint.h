@@ -1,5 +1,7 @@
 #pragma once
 
+#define BIT(n) (1 << (n))
+
 #define NULL (void*)0
 
 typedef	unsigned long long	uint64_t;

@@ -23,6 +23,8 @@
 
 #include <multiboot.h>
 
+multiboot_t mboot_s = {0};
+
 #define print_mem() kprintf("free: %d kb (%d mb), used %d kb (%d mb)\n", pmm_get_free_mem() / 1024, pmm_get_free_mem() / 1024 / 1024, pmm_get_used_mem() / 1024, pmm_get_used_mem() / 1024 / 1024);
 
 void test_handler(core_locals_t* locals) {
@@ -68,7 +70,7 @@ void kernel_thread() {
     uint32_t cpuid_max = cpuid_vendor(str);
 
     sprintf("CPU Vendor: %s\n", str);
-    
+
     cpuid_string(CPUID_INTELBRANDSTRING, str);
     sprintf("CPU BrandString: %s", str);
 
@@ -89,13 +91,15 @@ void kernel_thread() {
 }
 
 void kmain(multiboot_t* mboot) {
+    memcpy((uint8_t*)mboot, (uint8_t*)&mboot_s, sizeof(multiboot_t));
+
     screen_init();
     serial_init(COM1, UART_BAUD_115200);
 
     gdt_init();
 
-    mm_memory_setup(mboot);
-    acpi_init(mboot);
+    acpi_init(&mboot_s);
+    mm_memory_setup(&mboot_s);
 
     pic_remap(32, 40);
     apic_configure();

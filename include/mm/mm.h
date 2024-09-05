@@ -5,6 +5,8 @@
 
 #define PAGE_SIZE 0x1000
 
+#define ALIGN(addr) (((addr) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
+
 typedef void* symbol[];
 
 extern symbol __kernel_end;

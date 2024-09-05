@@ -17,8 +17,17 @@ extern char smp_trampoline[];
 extern char smp_trampoline_end[];
 extern char smp_loaded[];
 
+core_locals_t bsp_locals;
+
 void init_core_locals(uint8_t id) {
-    core_locals_t* locals   = kcalloc(sizeof(core_locals_t));
+    core_locals_t* locals;
+
+    if (id == 0) {
+        locals = &bsp_locals;
+    } else {
+        locals = kcalloc(sizeof(core_locals_t));
+    }
+
     memset((uint8_t*)locals, 0, sizeof(core_locals_t));
     locals->state           = CORE_OFFLINE;
     locals->meta_pointer    = (uint32_t)locals;
@@ -85,7 +94,7 @@ void smp_launch_cpus() {
 
                 smp_info_ptr->status    = 0;
                 smp_info_ptr->id        = id;
-                smp_info_ptr->cr3       = (uint32_t)vmm_get_base();
+                smp_info_ptr->cr3       = (uint32_t)vmm_get_cr3();
                 smp_info_ptr->esp       = (uint32_t)(kmalloc(0x4000) + 0x4000);
                 smp_info_ptr->entry     = (uint32_t)smp_loaded;
                 smp_info_ptr->gdt_ptr   = 0x600;

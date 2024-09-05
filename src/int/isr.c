@@ -2,6 +2,7 @@
 #include <int/idt.h>
 #include <sys/pic.h>
 #include <sys/apic.h>
+#include <sys/smp.h>
 
 #include <drivers/serial.h>
 
@@ -15,6 +16,9 @@ void register_int_handler(uint8_t n, int_handler_t handler) {
 void isr_handler() {
 	core_locals_t* locals = get_core_locals();
 	core_regs_t* regs = &locals->irq_regs;
+
+	// if (regs->int_num != 32 && regs->int_num != 240)
+	// 	isprintf("Interrupt %d on core %u (in_irq %u)\n", regs->int_num, locals->core_index, locals->in_irq);
 
 	int_handler_t handler = handlers[regs->int_num];
 	if (handler)

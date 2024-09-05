@@ -2,7 +2,7 @@
 
 #include <klibc/stdlib.h>
 #include <int/dt.h>
-#include <sys/smp.h>
+#include <sys/core.h>
 
 typedef void (*int_handler_t) (core_locals_t*);
 

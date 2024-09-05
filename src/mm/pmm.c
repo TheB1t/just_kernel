@@ -1,13 +1,13 @@
 #include <mm/pmm.h>
-#include <mm/vmm.h>
 #include <klibc/math.h>
 
 #include <int/isr.h>
 
-#include <drivers/serial.h>
+#define BITMAP_MAX_PAGE ((((uint32_t)-1) / PAGE_SIZE) / 8)
 
-uint8_t* bitmap;
-uint32_t bitmap_max_page;
+extern symbol stack;
+
+uint8_t bitmap[BITMAP_MAX_PAGE] = {0};
 
 uint32_t total_memory = 0;
 uint32_t used_memory = 0;
@@ -34,17 +34,20 @@ uint8_t pmm_get_bit(uint32_t page) {
     return bitmap[byte] & (1 << bit);
 }
 
-void pmm_memory_setup(uint8_t* new_bitmap, uint32_t bitmap_bytes, multiboot_memory_map_t* mmap, uint32_t mmap_len) {
-    bitmap = new_bitmap;
-    bitmap_max_page = bitmap_bytes * 8;
+void pmm_memory_setup(multiboot_mmap_t* mmap, uint32_t mmap_len) {
+    multiboot_mmap_t* start = &mmap[0];
+    multiboot_mmap_t* end = &mmap[mmap_len - 1];
 
-    memset(bitmap, 0xFF, bitmap_bytes);
+    uint32_t mem_length = ROUND_UP((end->addr_low + end->len_low) - start->addr_low, PAGE_SIZE);
+    mem_length = mem_length ? mem_length : 0xFFFFFFFF;
+
+    memset(bitmap, 0xFF, BITMAP_MAX_PAGE);
 
     for (uint32_t i = 0; i < mmap_len; i++) {
         uint32_t rounded_block_start = ROUND_UP(mmap[i].addr_low, PAGE_SIZE);
         uint32_t rounded_block_end = ROUND_UP((mmap[i].addr_low + mmap[i].len_low), PAGE_SIZE);
         uint32_t rounded_block_len = rounded_block_end - rounded_block_start;
-        
+
         if (mmap[i].type == MULTIBOOT_MEMORY_AVAILABLE && mmap[i].addr_low >= 0x100000) {
             for (uint32_t i = 0; i < rounded_block_len / PAGE_SIZE; i++)
                 pmm_clear_bit(i + (rounded_block_start / PAGE_SIZE));
@@ -55,14 +58,14 @@ void pmm_memory_setup(uint8_t* new_bitmap, uint32_t bitmap_bytes, multiboot_memo
 
     total_memory = available_memory;
 
-    sprintf("[PMM] Total memory %d KB (max page %d)\n", total_memory / 1024, bitmap_max_page);
+    sprintf("[PMM] kernel: 0x%08x - 0x%08x\n", __kernel_start, __kernel_end);
 }
 
 static uint32_t find_free_page(uint32_t pages) {
     uint32_t found_pages = 0;
     uint32_t first_page = 0;
 
-    for (uint32_t i = 0; i < bitmap_max_page; i++) {
+    for (uint32_t i = 0; i < BITMAP_MAX_PAGE; i++) {
         if (!pmm_get_bit(i)) {
             found_pages += 1;
             if (first_page == 0) {
@@ -120,7 +123,7 @@ void pmm_unalloc(void* addr, uint32_t size) {
     uint32_t page = ((uint32_t) addr & ~(0xfff)) / PAGE_SIZE;
     uint32_t pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    if (page + pages > bitmap_max_page) {
+    if (page + pages > BITMAP_MAX_PAGE) {
         sprintf("[PMM] trying to free bad memory: 0x%08x. Size: 0x%08x\n", addr, size);
         while(1) asm volatile("hlt");
     }
@@ -132,14 +135,14 @@ void pmm_unalloc(void* addr, uint32_t size) {
     used_memory -= pages * PAGE_SIZE;
 }
 
-uint32_t pmm_get_free_mem() {
+uint32_t pmm_free_mem() {
     return available_memory;
 }
 
-uint32_t pmm_get_used_mem() {
+uint32_t pmm_used_mem() {
     return used_memory;
 }
 
-uint32_t pmm_get_total_mem() {
+uint32_t pmm_total_mem() {
     return total_memory;
 }

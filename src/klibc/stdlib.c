@@ -4,6 +4,8 @@
 #include <mm/pmm.h>
 #include <mm/vmm.h>
 
+#include <sys/smp.h>
+
 #include <proc/sched.h>
 
 extern Heap_t* kernel_heap;
@@ -27,14 +29,14 @@ void *kcalloc(uint32_t size) {
 
 void print_stacktrace(core_regs_t* regs) {
   uint32_t* ebp = (uint32_t*)regs->ebp;
-  
+
   sprintf("Stack trace: \n");
   sprintf("    0x%08x\n", regs->eip);
   while (ebp) {
     uint32_t eip = ebp[1];
 
     sprintf("    0x%08x\n", eip);
-    ebp = (uint32_t*)ebp[0]; 
+    ebp = (uint32_t*)ebp[0];
   }
 }
 

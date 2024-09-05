@@ -19,7 +19,7 @@ process_t* proc_create(const char* name, void* entry, uint8_t ring) {
     INIT_LIST_HEAD(PROC_THREAD_HEAD(proc));
 
     if (ring == 3) {
-        proc->cr3 = vmm_fork_kernel_space(base_kernel_cr3);
+        proc->cr3 = (uint32_t)vmm_fork_kernel_space();
     } else {
         proc->cr3 = base_kernel_cr3;
     }

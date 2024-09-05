@@ -122,16 +122,16 @@ void _sched(core_locals_t* locals) {
     thread_t* thread = locals->current_thread;
     thread_t* picked_thread = NULL;
 
-    isprintf("[%u] Thread list (c 0x%08x):\n", locals->core_index, thread);
-    if (have_thread()) {
-        for_each_thread(iter, thread_list) {
-            thread_t* thread = entry_thread(iter);
+    // isprintf("[%u] Thread list (c 0x%08x):\n", locals->core_index, thread);
+    // if (have_thread()) {
+    //     for_each_thread(iter, thread_list) {
+    //         thread_t* thread = entry_thread(iter);
 
-            isprintf("[%u] 0x%08x: %s:%u:%u\n", locals->core_index, thread, thread->parent->name, thread->tid, thread->state);
-        }
-    } else {
-        isprintf("[%u] Empty\n", locals->core_index);
-    }
+    //         isprintf("[%u] 0x%08x: %s:%u:%u\n", locals->core_index, thread, thread->parent->name, thread->tid, thread->state);
+    //     }
+    // } else {
+    //     isprintf("[%u] Empty\n", locals->core_index);
+    // }
 
     for_each_thread(iter, thread_list) {
         thread_t* t = entry_thread(iter);
@@ -156,7 +156,7 @@ void _sched(core_locals_t* locals) {
                     thread->state = THREAD_TERMINATED;
                 else {
                     thread->state = THREAD_STOPPED;
-                    isprintf("[%u][%s:%u] Stopped\n", locals->core_index, thread->parent->name, thread->tid);
+                    // isprintf("[%u][%s:%u] Stopped\n", locals->core_index, thread->parent->name, thread->tid);
                     goto switch_thread;
                 }
 
@@ -174,6 +174,8 @@ void _sched(core_locals_t* locals) {
     }
 
     if (picked_thread) {
+        // isprintf("[%u][%s:%u] Picked\n", locals->core_index, picked_thread->parent->name, picked_thread->tid);
+
         thread = picked_thread;
 
         thread->state = THREAD_RUNNING;
@@ -184,14 +186,14 @@ void _sched(core_locals_t* locals) {
         locals->state = CORE_ONLINE;
         locals->current_thread = thread;
 
-        isprintf("[%u][%s:%u] Started\n", locals->core_index, thread->parent->name, thread->tid);
+        // isprintf("[%u][%s:%u] Started\n", locals->core_index, thread->parent->name, thread->tid);
     } else if (!locals->current_thread && locals->state != CORE_IDLE) {
         assert(locals->idle_thread != NULL);
 
         locals->state = CORE_IDLE;
         load_context(locals->idle_thread, &locals->irq_regs);
 
-        isprintf("[%u] Idle\n", locals->core_index);
+        // isprintf("[%u] Idle\n", locals->core_index);
     }
 }
 
@@ -200,10 +202,10 @@ void _sched_runner(core_locals_t* locals) {
         _sched(locals);
         unlock(_sched_lock);
     } else {
-        if (locals->current_thread)
-            isprintf("Task %u on core %u overrunning\n", locals->current_thread->tid, locals->core_index);
-        else if (locals->state == CORE_IDLE)
-            isprintf("Core %u overrunning in IDLE state (?)\n", locals->core_index);
+        // if (locals->current_thread)
+        //     isprintf("Task %u on core %u overrunning\n", locals->current_thread->tid, locals->core_index);
+        // else if (locals->state == CORE_IDLE)
+        //     isprintf("Core %u overrunning in IDLE state (?)\n", locals->core_index);
     }
 }
 
