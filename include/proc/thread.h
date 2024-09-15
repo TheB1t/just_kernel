@@ -2,6 +2,7 @@
 
 #include <klibc/stdlib.h>
 #include <klibc/llist.h>
+#include <sys/core_regs.h>
 #include <proc/proc.h>
 
 #define THREAD_HEAD(x)          (&(x)->gt_head)
@@ -24,34 +25,13 @@
 #define entry_process_thread(iter)  list_entry(iter, thread_t, pt_list)
 
 typedef struct {
-    uint32_t    eax;
-    uint32_t    ebx;
-    uint32_t    ecx;
-    uint32_t    edx;
-    uint32_t    ebp;
-    uint32_t    edi;
-    uint32_t    esi;
-
-    uint32_t    esp;
-    uint32_t    eip;
-
-    uint32_t    ss;
-    uint32_t    cs;
-    uint32_t    fs;
-    uint32_t    eflags;
-
-    uint32_t    cr3;
-    uint32_t    mxcsr;
-    uint16_t    fcw;
-} thread_regs_t;
-
-typedef struct {
     struct list_head gt_head;
 } thread_list_t;
 
 typedef enum {
     THREAD_STOPPED,
     THREAD_RUNNING,
+    THREAD_SLEEPING,
     THREAD_TERMINATED,
 
     _TASK_LAST,
@@ -59,25 +39,31 @@ typedef enum {
 } thread_state_t;
 
 typedef struct thread {
-    struct list_head pt_list;
-    struct list_head gt_list;
+    core_regs_t*    regs;
+    thread_state_t  state;
 
-    uint32_t    stack;
-
+    int32_t     cpu;
     int32_t     tid;
     process_t*  parent;
 
-    int32_t     cpu;
-    uint8_t     ring;
+    uint32_t    user_stack;
+    uint32_t    kernel_stack;
 
-    thread_state_t  state;
-    thread_regs_t   regs;
+    uint32_t    sleep_time;
+    uint32_t    exitcode;
+    uint32_t    priority;
 
     uint32_t    tsc_started;   // The last time this task was started
     uint32_t    tsc_stopped;   // The last time this task was stopped
     uint32_t    tsc_total;     // The total time this task has been running for
 
-    char        sse_region[512] __attribute__((aligned(16)));
+    struct list_head pt_list;
+    struct list_head gt_list;
+
+    sse_region_t* sse_region;
 } thread_t;
 
 thread_t* thread_create(process_t* proc, void* entry);
+void thread_free(thread_t* thread);
+
+extern void _idle();

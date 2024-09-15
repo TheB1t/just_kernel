@@ -1,6 +1,6 @@
 #include <drivers/early_screen.h>
 
-static screen_char* framebuffer = (screen_char*)0xB8000; 
+static screen_char* framebuffer = (screen_char*)0xB8000;
 
 screen_cursor   cursor          = { .x = 0, .y = 0 };
 screen_color    current_color   = { .foreground = 15, .background = 0 };
@@ -39,9 +39,10 @@ void screen_scroll() {
 void screen_putChar(char c) {
 	switch (c) {
 		case '\b':
-			if (cursor.x)
+			if (cursor.x) {
 				cursor.x--;
 				framebuffer[(cursor.y * SCREEN_WIDTH) + cursor.x] = blank;
+			}
 			break;
 
 		case '\t':
@@ -50,7 +51,7 @@ void screen_putChar(char c) {
 
 		case '\n':
 			cursor.y++;
-			
+
 		case '\r':
 			cursor.x = 0;
 			break;

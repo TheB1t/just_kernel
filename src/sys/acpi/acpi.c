@@ -3,7 +3,8 @@
 
 extern rsdp1_t* ll_find_rsdp(void);
 
-rsdp1_t* rsdp;
+rsdp1_t*    rsdp = 0;
+madt_t*     madt = 0;
 
 uint32_t checksum_calc(uint8_t* data, uint32_t length) {
     uint32_t total = 0;
@@ -16,10 +17,11 @@ uint32_t checksum_calc(uint8_t* data, uint32_t length) {
 }
 
 rsdp1_t* get_rsdp1() {
-    rsdp1_t* ret = ll_find_rsdp();
-    if (ret)
-        vmm_map(ret, ret, 2, VMM_PRESENT | VMM_WRITE);
-    return ret;
+    return rsdp;
+}
+
+madt_t* get_madt() {
+    return madt;
 }
 
 sdt_header_t *get_root_sdt_header() {
@@ -29,7 +31,6 @@ sdt_header_t *get_root_sdt_header() {
     sdt_header_t* header;
     if (rsdp->revision == 2) {
         rsdp2_t* rsdp2 = (rsdp2_t*)rsdp;
-        uint32_t check = checksum_calc((uint8_t*)((uint32_t)rsdp2 + sizeof(rsdp1_t)), sizeof(rsdp2_t) - sizeof(rsdp1_t));
 
         if (checksum_calc((uint8_t*)((uint32_t)rsdp2 + sizeof(rsdp1_t)), sizeof(rsdp2_t) - sizeof(rsdp1_t)))
             return (sdt_header_t*)0;
@@ -38,9 +39,6 @@ sdt_header_t *get_root_sdt_header() {
     } else {
         header = (sdt_header_t*)rsdp->rsdt_address;
     }
-
-    vmm_map((void*)header, (void*)header, 1, VMM_PRESENT | VMM_WRITE);
-    vmm_map((void*)header, (void*)header, (header->length + PAGE_SIZE - 1) / PAGE_SIZE, VMM_PRESENT | VMM_WRITE);
 
     return checksum_calc((uint8_t*)header, header->length) ? (sdt_header_t*)0 : header;
 }
@@ -57,10 +55,7 @@ sdt_header_t* search_sdt_header(char* sig) {
             sdt_header_t* header = (sdt_header_t*)rsdt->other_sdts[i];
             if (!rsdt->other_sdts[i])
                 continue;
-            
-            vmm_map((void*)header, (void*)header, 1, VMM_PRESENT | VMM_WRITE);
-            vmm_map((void*)header, (void*)header, (header->length + PAGE_SIZE - 1) / PAGE_SIZE, VMM_PRESENT | VMM_WRITE);
-         
+
             if (*(uint32_t*)sig == header->signature_num)
                 if (!checksum_calc((uint8_t*)header, header->length))
                     return header;
@@ -72,9 +67,6 @@ sdt_header_t* search_sdt_header(char* sig) {
             if (!xsdt->other_sdts[i])
                 continue;
 
-            vmm_map((void*)header, (void*)header, 1, VMM_PRESENT | VMM_WRITE);
-            vmm_map((void*)header, (void*)header, (header->length + PAGE_SIZE - 1) / PAGE_SIZE, VMM_PRESENT | VMM_WRITE);
-
             if (*(uint32_t*)sig == header->signature_num)
                 if (!checksum_calc((uint8_t*)header, header->length))
                     return header;
@@ -84,7 +76,19 @@ sdt_header_t* search_sdt_header(char* sig) {
     return (sdt_header_t*)0;
 }
 
-uint32_t acpi_init() {
-    rsdp = get_rsdp1();
-    return rsdp != (rsdp1_t*)0;
+bool acpi_init() {
+    rsdp = ll_find_rsdp();
+
+    if (!rsdp)
+        return false;
+
+    ser_printf("[ACPI] Found RSDP at 0x%08x\n", rsdp);
+
+    madt = (madt_t*)search_sdt_header("APIC");
+    if (!madt)
+        return false;
+
+    ser_printf("[ACPI] Found MADT at 0x%08x\n", madt);
+
+    return true;
 }

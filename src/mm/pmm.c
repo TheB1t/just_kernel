@@ -34,21 +34,21 @@ uint8_t pmm_get_bit(uint32_t page) {
     return bitmap[byte] & (1 << bit);
 }
 
-void pmm_memory_setup(multiboot_mmap_t* mmap, uint32_t mmap_len) {
-    multiboot_mmap_t* start = &mmap[0];
-    multiboot_mmap_t* end = &mmap[mmap_len - 1];
+void pmm_memory_setup(multiboot_memory_map_t* mmap, uint32_t mmap_len) {
+    multiboot_memory_map_t* start = &mmap[0];
+    multiboot_memory_map_t* end = &mmap[mmap_len - 1];
 
-    uint32_t mem_length = ROUND_UP((end->addr_low + end->len_low) - start->addr_low, PAGE_SIZE);
+    uint32_t mem_length = ROUND_UP((uint32_t)((end->addr + end->len) - start->addr), PAGE_SIZE);
     mem_length = mem_length ? mem_length : 0xFFFFFFFF;
 
     memset(bitmap, 0xFF, BITMAP_MAX_PAGE);
 
     for (uint32_t i = 0; i < mmap_len; i++) {
-        uint32_t rounded_block_start = ROUND_UP(mmap[i].addr_low, PAGE_SIZE);
-        uint32_t rounded_block_end = ROUND_UP((mmap[i].addr_low + mmap[i].len_low), PAGE_SIZE);
+        uint32_t rounded_block_start = ROUND_UP((uint32_t)mmap[i].addr, PAGE_SIZE);
+        uint32_t rounded_block_end = ROUND_UP((uint32_t)(mmap[i].addr + mmap[i].len), PAGE_SIZE);
         uint32_t rounded_block_len = rounded_block_end - rounded_block_start;
 
-        if (mmap[i].type == MULTIBOOT_MEMORY_AVAILABLE && mmap[i].addr_low >= 0x100000) {
+        if (mmap[i].type == MULTIBOOT_MEMORY_AVAILABLE && (uint32_t)mmap[i].addr >= 0x100000) {
             for (uint32_t i = 0; i < rounded_block_len / PAGE_SIZE; i++)
                 pmm_clear_bit(i + (rounded_block_start / PAGE_SIZE));
 
@@ -58,7 +58,7 @@ void pmm_memory_setup(multiboot_mmap_t* mmap, uint32_t mmap_len) {
 
     total_memory = available_memory;
 
-    sprintf("[PMM] kernel: 0x%08x - 0x%08x\n", __kernel_start, __kernel_end);
+    ser_printf("[PMM] kernel: 0x%08x - 0x%08x\n", __kernel_start, __kernel_end);
 }
 
 static uint32_t find_free_page(uint32_t pages) {
@@ -80,8 +80,9 @@ static uint32_t find_free_page(uint32_t pages) {
             return first_page;
     }
 
-    sprintf("[PMM] Error! Couldn't find free memory!\n");
-    while(1) asm volatile("hlt");
+    ser_printf("[PMM] Error! Couldn't find free memory!\n");
+    while(1)
+        asm volatile("hlt");
 
     return 0;
 }
@@ -118,14 +119,15 @@ void* pmm_alloc_from(void* addr, uint32_t size) {
 
 void pmm_unalloc(void* addr, uint32_t size) {
     if ((uint32_t)addr % PAGE_SIZE != 0)
-        sprintf("[PMM] freeing bad address, caller: 0x%08x, addr: 0x%08x\n", __builtin_return_address(0), addr);
+        ser_printf("[PMM] freeing bad address, caller: 0x%08x, addr: 0x%08x\n", __builtin_return_address(0), addr);
 
     uint32_t page = ((uint32_t) addr & ~(0xfff)) / PAGE_SIZE;
     uint32_t pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
 
     if (page + pages > BITMAP_MAX_PAGE) {
-        sprintf("[PMM] trying to free bad memory: 0x%08x. Size: 0x%08x\n", addr, size);
-        while(1) asm volatile("hlt");
+        ser_printf("[PMM] trying to free bad memory: 0x%08x. Size: 0x%08x\n", addr, size);
+        while(1)
+            asm volatile("hlt");
     }
 
     for (uint32_t i = 0; i < pages; i++)
@@ -145,4 +147,14 @@ uint32_t pmm_used_mem() {
 
 uint32_t pmm_total_mem() {
     return total_memory;
+}
+
+#define _B(V) ((V) / 1024)
+#define KB(V) _B(V)
+#define MB(V) _B(KB(V))
+
+void pmm_print_memory_stats() {
+    kprintf("[PMM] Total memory: %u MB (%u KB)\n", MB(total_memory), KB(total_memory));
+    kprintf("[PMM] Available memory: %u MB (%u KB)\n", MB(available_memory), KB(available_memory));
+    kprintf("[PMM] Used memory: %u MB (%u KB)\n", MB(used_memory), KB(used_memory));
 }

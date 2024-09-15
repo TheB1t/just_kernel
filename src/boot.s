@@ -17,7 +17,7 @@ mboot:
   dd  MBOOT_HEADER_MAGIC
   dd  MBOOT_HEADER_FLAGS
   dd  MBOOT_CHECKSUM
-   
+
   dd  mboot
   dd  __kernel_code_start
   dd  __kernel_bss_start
@@ -40,15 +40,18 @@ start:
   mov esp, stack.top
 
   push ebx
-  ; Enable SSE
-  mov eax, cr0
-  and ax, 0xFFFB
-  or  ax, 0x2
-  mov cr0, eax
-  mov eax, cr4
-  or  ax, 3 << 9
-  mov cr4, eax
+  ; ; Init FPU
+  ; fninit
+
+  ; ; Enable SSE
+  ; mov eax, cr0
+  ; and ax, 0xFFFB
+  ; or  ax, 0x2
+  ; mov cr0, eax
+  ; mov eax, cr4
+  ; or  ax, 3 << 9
+  ; mov cr4, eax
 
   ; Execute the kernel
   cli
-  call kmain  
+  call kmain

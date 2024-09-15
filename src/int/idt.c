@@ -6,7 +6,7 @@
 #define shift(v, n)				((v) << (n))
 #define pack_flags(T, DPL, P)	(0x00 | shift(T & 0b1111, 0) | shift(DPL & 0b11, 5) | shift(P & 0b1, 7))
 
-#define SET_GATE(num, func)		idt_set_gate(num, (uint32_t)func, DESC_SEG(DESC_KERNEL_CODE, PL_RING0), pack_flags(0xE, PL_RING0, 0b1))
+#define SET_GATE(num, func)		idt_set_gate(num, (uint32_t)func, DESC_SEG(DESC_KERNEL_CODE, PL_RING0), pack_flags(0xE, PL_RING3, 0b1))
 #define SET_GATE_ISR(num)		SET_GATE(num, isr##num)
 
 extern void idt_flush(uint32_t);
@@ -21,14 +21,10 @@ void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags) {
 	locals->idt_entries[num].sel		= sel;
 	locals->idt_entries[num].always0	= 0;
 
-	locals->idt_entries[num].flags		= flags;// | 0x60;
+	locals->idt_entries[num].flags		= flags | 0x60;
 }
 
 void idt_init() {
-	core_locals_t* locals = get_core_locals();
-
-	memset((uint8_t*)locals->idt_entries, 0, sizeof(idt_entry_t) * IDT_ENTRIES);
-
 	SET_GATE_ISR(0);
 	SET_GATE_ISR(1);
 	SET_GATE_ISR(2);
@@ -286,11 +282,5 @@ void idt_init() {
 	SET_GATE_ISR(254);
 	SET_GATE_ISR(255);
 
-	idt_ptr_t idt_ptr = {
-		.limit	= sizeof(idt_entry_t) * IDT_ENTRIES - 1,
-		.base	= (uint32_t)locals->idt_entries
-	};
-
-	idt_flush((uint32_t)&idt_ptr);
-    asm volatile("sti");
+	idt_flush((uint32_t)&get_core_locals()->idt_entries_ptr);
 }

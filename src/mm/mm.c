@@ -6,17 +6,17 @@
 Heap_t  _kernel_heap_base;
 Heap_t* kernel_heap;
 
-void mm_memory_setup(multiboot_t* mboot) {
-    if (!(mboot->flags & MULTIBOOT_FLAG_MMAP))
+void mm_memory_setup(multiboot_info_t* mboot) {
+    if (!(mboot->flags & MULTIBOOT_INFO_MEM_MAP))
         panic("Bootloader can't store memory map!\n");
 
-    multiboot_mmap_t* mmap = (multiboot_mmap_t*)mboot->mmap_addr;
-    uint32_t mmap_len = mboot->mmap_length / sizeof(multiboot_mmap_t);
+    multiboot_memory_map_t* mmap = (multiboot_memory_map_t*)mboot->mmap_addr;
+    uint32_t mmap_len = mboot->mmap_length / sizeof(multiboot_memory_map_t);
 
-    sprintf("[MM] Memory map provided by bootloader:\n");
+    ser_printf("[MM] Memory map provided by bootloader:\n");
     #define GET_TYPE(v, t) v[i].type == MULTIBOOT_MEMORY_##t ? #t :
     for (uint32_t i = 0; i < mmap_len; i++)
-        sprintf("   [%d] 0x%08x - 0x%08x [%s]\n", i, mmap[i].addr_low, mmap[i].addr_low + mmap[i].len_low,
+        ser_printf("   [%d] 0x%08x - 0x%08x [%s]\n", i, (uint32_t)mmap[i].addr, (uint32_t)(mmap[i].addr + mmap[i].len),
             GET_TYPE(mmap, AVAILABLE)
             GET_TYPE(mmap, RESERVED)
             GET_TYPE(mmap, ACPI_RECLAIMABLE)
@@ -31,17 +31,15 @@ void mm_memory_setup(multiboot_t* mboot) {
     uint32_t kernel_end = (uint32_t)__kernel_end;
 
     if (!pmm_alloc_from((void*)kernel_start, kernel_end - kernel_start)) {
-        sprintf("[MM] Failed to allocate kernel address space!");
+        ser_printf("[MM] Failed to allocate kernel address space!");
         panic("Can't init memory manager");
     }
 
-    sprintf("[MM] Available memory %d KB\n", pmm_free_mem() / 1024);
-    sprintf("[MM] Used memory %d KB\n", pmm_used_mem() / 1024);
-    sprintf("[MM] Total memory %d KB\n", pmm_total_mem() / 1024);
+    pmm_print_memory_stats();
 
     vmm_memory_setup(mmap, mmap_len);
 
     kernel_heap = createHeap((uint32_t)&_kernel_heap_base, (uint32_t)vmm_get_cr3(), 0x01000000, HEAP_MIN_SIZE, 0x02000000, VMM_WRITE);
 
-    sprintf("[MM] Kernel heap initialized\n");
+    ser_printf("[MM] Kernel heap initialized\n");
 }

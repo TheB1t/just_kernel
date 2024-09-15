@@ -5,7 +5,7 @@ extern uint64_t _cpuid(CPUID_Request_t request);
 uint64_t cpuid(CPUID_Request_t request) {
     return _cpuid(request);
 }
- 
+
 uint32_t _cpuid_string(CPUID_Request_t request, uint32_t* ebx, uint32_t* ecx, uint32_t* edx) {
     uint32_t ret;
 
@@ -26,7 +26,7 @@ void _to_string(uint32_t part0, uint32_t part1, uint32_t part2, uint32_t part3, 
         }
     }
 
-    str[17] = '\0';
+    str[16] = '\0';
 }
 
 uint32_t cpuid_vendor(CPUID_String_t str) {

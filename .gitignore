@@ -1,4 +1,7 @@
 *.o
 *.img
+*.lock
+serial.txt
 build/**
 .vscode/settings.json
+bx_enh_dbg.ini

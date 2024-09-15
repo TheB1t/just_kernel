@@ -3,15 +3,17 @@
 
 volatile uint32_t global_ticks = 0;
 
+extern void _sched_all(core_locals_t* locals);
+
 void timer_handler(core_locals_t* locals) {
     global_ticks++;
-
-    if (global_ticks % (8) == 0)
-        _sched_all(locals);
+    _sched_all(locals);
 }
 
 void pit_set_freq() {
-    uint16_t divisor = 1193;
+    uint32_t divisor = PIT_DIVISOR;
+
+    ser_printf("PIT divisor %u, time %u\n", PIT_DIVISOR, PIT_SPEED_US);
 
     uint8_t low = (uint8_t)(divisor & 0xFF);
     uint8_t high = (uint8_t)((divisor >> 8) & 0xFF);

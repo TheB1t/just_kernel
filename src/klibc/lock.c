@@ -19,6 +19,6 @@ void interrupt_unlock(interrupt_state_t state) {
 }
 
 void deadlock_handler(lock_t *lock) {
-    sprintf("Warning: Potential deadlock in lock %s held by %s\n", lock->name, lock->holder);
-    sprintf("Attempting to get lock from %s\n", lock->attempting_to_get);
+    ser_printf("Warning: Potential deadlock in lock %s held by %s\n", lock->name, lock->holder);
+    ser_printf("Attempting to get lock from %s\n", lock->attempting_to_get);
 }

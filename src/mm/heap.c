@@ -64,7 +64,7 @@ uint32_t heap_malloc(Heap_t* heap, uint32_t size, uint8_t align) {
             addr = (uint32_t)palignedAlloc(size, heap);
         else
             addr = (uint32_t)alloc(size, heap);
-            
+
         return addr;
     }
 
@@ -108,7 +108,7 @@ static void insertChunk(HeapChunk_t* chunk, Heap_t* heap) {
 }
 
 static void removeChunk(HeapChunk_t* chunk) {
-	__list_del_entry(&(chunk->list));	
+	__list_del_entry(&(chunk->list));
 }
 
 Heap_t* createHeap(uint32_t placementAddr, uint32_t cr3, uint32_t start, uint32_t size, uint32_t max, uint16_t perms) {
@@ -171,13 +171,14 @@ static size_t contract(size_t newSize, Heap_t* heap) {
 
     size_t size = oldEnd - heap->endAddr;
     if (!is_mapped((void*)heap->endAddr, (void*)heap->cr3))
-        sprintf("[heap] trying to free unmapped memory! addr: 0x%08x\n", heap->endAddr);
+        ser_printf("[heap] trying to free unmapped memory! addr: 0x%08x\n", heap->endAddr);
 
     vmm_unmap_pages((void*)heap->endAddr, (void*)heap->cr3, size / PAGE_SIZE);
-	
+
     void* phys = virt_to_phys((void*)heap->endAddr, (void*)heap->cr3);
-    if ((uint32_t)phys != 0xFFFFFFFF)
+    if ((uint32_t)phys != 0xFFFFFFFF) {
         pmm_unalloc(phys, size);
+	}
 
 	return newSize;
 }
@@ -190,8 +191,6 @@ void* alloc(size_t size, Heap_t* heap) {
 		size_t oldSize = heap->endAddr - heap->startAddr;
 		size_t oldEndAddr = heap->endAddr;
 		expand(oldSize + nb, heap);
-
-		size_t newSize = heap->endAddr - heap->startAddr;
 
 		struct list_head* tmp = 0;
 		if (!list_empty(get_head(heap))) {
@@ -250,6 +249,7 @@ void* alloc(size_t size, Heap_t* heap) {
 
 _Lassert:
 	panic("(alloc) Memory Corrupt");
+	__builtin_unreachable();
 }
 
 void free(void* ptr, Heap_t* heap) {
@@ -258,7 +258,7 @@ void free(void* ptr, Heap_t* heap) {
 
 	if (!ok_address(ptr, heap))
 		goto _Lassert;
-	
+
 	HeapChunk_t* block = mem2chunk(ptr);
 
 	if (!ok_inuse(block))

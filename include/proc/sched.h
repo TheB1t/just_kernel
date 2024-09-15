@@ -10,6 +10,7 @@
 #define del_thread2proc(thread)         list_del(PROC_THREAD_LIST(thread))
 
 #define proc_have_thread(proc)          (!list_empty(PROC_THREAD_HEAD(proc)))
+#define proc_num_threads(proc)          list_size(PROC_THREAD_HEAD(proc))
 
 extern process_t* kernel_proc;
 

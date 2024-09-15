@@ -1,6 +1,5 @@
 struc SMPBootInfo
 	._status:   resb 1
-    ._id:       resb 1
     ._cr3:      resd 1
     ._esp:      resd 1
     ._entry:    resd 1
@@ -55,14 +54,17 @@ smp_trampoline_end:
 [GLOBAL smp_loaded]
 type smp_loaded function
 smp_loaded:
-    ; Enable SSE
-    mov eax, cr0
-    and ax, 0xFFFB
-    or  ax, 0x2
-    mov cr0, eax
-    mov eax, cr4
-    or  ax, 3 << 9
-    mov cr4, eax
+    ; ; Init FPU
+    ; fninit
+
+    ; ; Enable SSE
+    ; mov eax, cr0
+    ; and ax, 0xFFFB
+    ; or  ax, 0x2
+    ; mov cr0, eax
+    ; mov eax, cr4
+    ; or  ax, 3 << 9
+    ; mov cr4, eax
 
     mov byte [edx + SMPBootInfo._status], 2
     lock inc byte [smp_boot_counter]

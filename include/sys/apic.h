@@ -40,14 +40,6 @@ typedef struct {
 } __attribute__((packed)) madt_ent5_t;
 
 typedef struct {
-    sdt_header_t header;
-
-    uint32_t    local_apic_addr;
-    uint32_t    apic_flags;
-    uint8_t     entries[];
-} __attribute__((packed)) madt_t;
-
-typedef struct {
     uint32_t    addr;
     uint32_t    reserved[3];
     uint32_t    data;

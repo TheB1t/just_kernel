@@ -12,7 +12,9 @@
 #include <sys/pic.h>
 #include <sys/smp.h>
 #include <sys/tss.h>
+#include <sys/stack_trace.h>
 
+#include <proc/syscalls.h>
 #include <proc/sched.h>
 
 #include <io/cpuid.h>
@@ -23,98 +25,117 @@
 
 #include <multiboot.h>
 
-multiboot_t mboot_s = {0};
+/*
+    TODO:
+    - Implement VFS
+    - Split kernel and user space memory
+    - Use HPET instead of PIT
+    - initrd support
+*/
 
-#define print_mem() kprintf("free: %d kb (%d mb), used %d kb (%d mb)\n", pmm_get_free_mem() / 1024, pmm_get_free_mem() / 1024 / 1024, pmm_get_used_mem() / 1024, pmm_get_used_mem() / 1024 / 1024);
+multiboot_info_t mboot_s = {0};
 
-void test_handler(core_locals_t* locals) {
-    core_regs_t* regs = &locals->irq_regs;
-
-    kprintf("Hello from interrupt! Core %u (in_irq %u)\n", locals->apic_id, locals->in_irq);
-    uint32_t esp;	asm volatile("mov %%esp, %0" : "=r" (esp));
-    isprintf("IRQ Stack: 0x%08x, Stack: 0x%08x, Stack: 0x%08x, EIP: 0x%08x, SS: 0x%08x\n", locals->irq_stack, esp, regs->esp, regs->eip, regs->ss0);
+void test_handler() {
+    core_locals_t* locals = get_core_locals();
+    ser_printf("Hello from syscall! (core %u, %s, tid %u, in_irq %u, cs 0x%02x)\n", locals->core_id, locals->current_thread->parent->name, locals->current_thread->tid, locals->in_irq, locals->irq_regs->cs);
 }
 
 void test_thread() {
-    core_locals_t* locals = get_core_locals();
-
-    uint32_t esp;	asm volatile("mov %%esp, %0" : "=r" (esp));
-    uint32_t ebp;	asm volatile("mov %%ebp, %0" : "=r" (ebp));
-    kprintf("Hello from thread! (core %u, %s, tid %u) | ESP: 0x%08x, EBP: 0x%08x\n", locals->core_index, locals->current_thread->parent->name, locals->current_thread->tid, esp, ebp);
+    syscall0(100);
+    syscall1(0, 0xDEADBEEF);
+    UNREACHEBLE;
 }
 
 void kernel_thread() {
-    interrupt_state_t state = interrupt_lock();
+    // pmm_print_memory_stats();
 
-    process_t* proc = proc_create("test", test_thread, 0);
+    process_t* proc = proc_create_kernel("test0", 0);
+    thread_create(proc, test_thread);
+    thread_create(proc, test_thread);
+    thread_create(proc, test_thread);
     sched_run_proc(proc);
 
-    for (uint32_t i = 0; i < 15; i++) {
-        thread_t* t = thread_create(proc, test_thread);
-        if (t)
-            sched_run_thread(t);
-    }
-
-    interrupt_unlock(state);
+    proc = proc_create_kernel("test1", 3);
+    thread_create(proc, test_thread);
+    thread_create(proc, test_thread);
+    thread_create(proc, test_thread);
+    sched_run_proc(proc);
 
     // -- -- -- -- -- -- TEST STUFF -- -- -- -- -- --
     core_locals_t* locals = get_core_locals();
-    kprintf("Hello from kmain! Core %u (in_irq %u)\n", locals->apic_id, locals->in_irq);
-
-    // print_mem()
-    // void* ptr1 = kmalloc(0x1000000);
-    // kfree(ptr1);
-    // print_mem()
+    kprintf("Hello from kmain! Core %u (in_irq %u)\n", locals->core_id, locals->in_irq);
 
     CPUID_String_t str = {0};
-    uint32_t cpuid_max = cpuid_vendor(str);
+    cpuid_vendor(str);
 
-    sprintf("CPU Vendor: %s\n", str);
+    kprintf("CPU Vendor: %s\n", str);
 
     cpuid_string(CPUID_INTELBRANDSTRING, str);
-    sprintf("CPU BrandString: %s", str);
+    kprintf("CPU BrandString: %s", str);
 
     cpuid_string(CPUID_INTELBRANDSTRINGMORE, str);
-    sprintf("%s", str);
+    kprintf("%s", str);
 
     cpuid_string(CPUID_INTELBRANDSTRINGEND, str);
-    sprintf("%s\n", str);
+    kprintf("%s\n", str);
 
     kprintf("Wait 1 second!\n");
-    sleep_no_task(1000);
+    syscall1(1, 1000);
     kprintf("DONE!\n");
 
-    for(;;);
+    // kprintf("Hello from kmain! Core %u (in_irq %u)\n", locals->apic_id, locals->in_irq);
+    // pmm_print_memory_stats();
 
     // uint32_t* hello_page_fault = (uint32_t*)0xDEADBEEF;
     // *hello_page_fault = 0xFACEB00C;
+
+    syscall1(0, 0xDEADBEEF);
+    UNREACHEBLE;
 }
 
-void kmain(multiboot_t* mboot) {
-    memcpy((uint8_t*)mboot, (uint8_t*)&mboot_s, sizeof(multiboot_t));
+void kmain(multiboot_info_t* mboot) {
+    memcpy((uint8_t*)mboot, (uint8_t*)&mboot_s, sizeof(multiboot_info_t));
+
+    gdt_init();
+    init_core_locals_bsp();
 
     screen_init();
     serial_init(COM1, UART_BAUD_115200);
 
-    gdt_init();
+    idt_init();
+    tss_init();
 
-    acpi_init(&mboot_s);
+    acpi_init();
     mm_memory_setup(&mboot_s);
 
     pic_remap(32, 40);
     apic_configure();
 
-    init_core_locals(0);
-    tss_init();
-    idt_init();
+	ser_printf("[GRUB] Loaded %d modules\n", mboot_s.mods_count);
+	ser_printf("[GRUB] Loaded %s table\n",
+		mboot_s.flags & MULTIBOOT_INFO_AOUT_SYMS    ? "symbol" :
+		mboot_s.flags & MULTIBOOT_INFO_ELF_SHDR     ? "section" : "no one"
+	);
+
+	if (mboot_s.flags & MULTIBOOT_INFO_ELF_SHDR) {
+		init_kernel_table((void*)mboot_s.u.elf_sec.addr, mboot_s.u.elf_sec.size, mboot_s.u.elf_sec.num, mboot_s.u.elf_sec.shndx);
+	} else {
+		ser_printf("Section table isn't loaded! Stacktrace in semi-functional mode");
+	}
 
     pit_init();
-    register_int_handler(0x80, test_handler);
 
     sched_init(kernel_thread);
 
-    smp_launch_cpus();
+    syscalls_init();
+    syscalls_set(100, (void*)test_handler);
 
+    asm volatile("sti");
+
+    uint8_t booted = smp_launch_cpus();
+    kprintf("Booted %u cores\n", booted);
+
+    sched_init_core();
     sched_run();
-    for(;;);
+    UNREACHEBLE;
 }

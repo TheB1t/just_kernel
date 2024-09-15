@@ -1,12 +1,8 @@
 [BITS 32]
 [SECTION .text]
 
-[GLOBAL load_thread]
-type load_thread function
-load_thread:
-    call eax
-
-    mov ebp, 0xDEADDEAD
-.end:
+[GLOBAL _idle]
+type _idle function
+_idle:
     hlt
-    jmp .end
+    jmp _idle

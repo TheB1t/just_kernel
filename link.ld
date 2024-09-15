@@ -6,7 +6,7 @@ KRNL_START = 0x00100000;
 
 SECTIONS
 {
-    . = KRNL_START + 0x100000;
+    . = KRNL_START;
 
     __kernel_start      = ALIGN(4K);
 

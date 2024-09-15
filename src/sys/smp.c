@@ -8,6 +8,7 @@
 #include <io/msr.h>
 #include <mm/vmm.h>
 #include <proc/sched.h>
+#include <proc/syscalls.h>
 
 SMPBootInfo_t* smp_info_ptr = (SMPBootInfo_t*)0x500;
 uint8_t smp_boot_counter    = 1;
@@ -17,30 +18,33 @@ extern char smp_trampoline[];
 extern char smp_trampoline_end[];
 extern char smp_loaded[];
 
-core_locals_t bsp_locals;
+core_locals_t bsp_core_locals = { 0 };
+sse_region_t sse_region = { 0 };
 
-void init_core_locals(uint8_t id) {
-    core_locals_t* locals;
+void init_core_locals_bsp() {
+    bsp_core_locals.idt_entries_ptr.base  = (uint32_t)bsp_core_locals.idt_entries;
+    bsp_core_locals.idt_entries_ptr.limit = sizeof(idt_entry_t) * IDT_ENTRIES - 1;
 
-    if (id == 0) {
-        locals = &bsp_locals;
-    } else {
-        locals = kcalloc(sizeof(core_locals_t));
-    }
+    write_msr(0xC0000101, (uint32_t)&bsp_core_locals);
+}
+
+void init_core_locals() {
+    core_locals_t* locals = kmalloc(sizeof(core_locals_t));
 
     memset((uint8_t*)locals, 0, sizeof(core_locals_t));
+
     locals->state           = CORE_OFFLINE;
-    locals->meta_pointer    = (uint32_t)locals;
-    locals->irq_stack       = (uint32_t)(kmalloc(PAGE_SIZE) + PAGE_SIZE);
-    locals->apic_id         = smp_get_lapic_id();
-    locals->core_index      = id;
+    locals->core_id         = smp_get_lapic_id();
+
+    core_locals_t* phys_locals = (core_locals_t*)vmm_virt_to_phys((void*)locals);
+    locals->idt_entries_ptr.base  = (uint32_t)phys_locals->idt_entries;
+    locals->idt_entries_ptr.limit = sizeof(idt_entry_t) * IDT_ENTRIES - 1;
+
     write_msr(0xC0000101, (uint32_t)locals);
 }
 
 core_locals_t* get_core_locals() {
-    core_locals_t* ret;
-    asm volatile("mov %%gs:(0), %0;" : "=r"(ret));
-    return ret;
+    return (core_locals_t*)(uint32_t)read_msr(0xC0000101);
 }
 
 uint8_t smp_get_lapic_id() {
@@ -66,23 +70,22 @@ void smp_send_global_interrupt(uint8_t int_num) {
     smp_send_global_ipi((1 << 14) | int_num);
 }
 
-void smp_launch_cpus() {
-    get_core_locals()->state = CORE_ONLINE;
-
+uint8_t smp_launch_cpus() {
     uint32_t code_size = smp_trampoline_end - smp_trampoline;
 
     if (code_size > PAGE_SIZE) {
-        sprintf("[SMP] Trampoline code size is too big (> 4096 bytes)");
+        ser_printf("[SMP] Trampoline code size is too big (> 4096 bytes)");
     }
 
-    vmm_remap((void*)0, (void*)0, 2, VMM_WRITE | VMM_PRESENT);
+    vmm_remap((void*)0, (void*)0, 3, VMM_WRITE | VMM_PRESENT);
 
     memcpy((uint8_t*)smp_trampoline, (uint8_t*)0x1000, code_size);
     memset((uint8_t*)smp_info_ptr, 0, sizeof(SMPBootInfo_t));
     memcpy((uint8_t*)&gdt, (uint8_t*)0x600, sizeof(gdt_ptr_t));
 
-    sprintf("[SMP] Start initialization\n");
+    ser_printf("[SMP] Start initialization\n");
     uint32_t id = 0;
+
     struct list_head* iter0;
     list_for_each(iter0, LIST_GET_HEAD(&madt_cpu)) {
         madt_ent0_t* cpu = (madt_ent0_t*)plist_get(iter0);
@@ -93,9 +96,8 @@ void smp_launch_cpus() {
                 memset((uint8_t*)smp_info_ptr, 0, sizeof(SMPBootInfo_t));
 
                 smp_info_ptr->status    = 0;
-                smp_info_ptr->id        = id;
                 smp_info_ptr->cr3       = (uint32_t)vmm_get_cr3();
-                smp_info_ptr->esp       = (uint32_t)(kmalloc(0x4000) + 0x4000);
+                smp_info_ptr->esp       = (uint32_t)0x2000 + PAGE_SIZE;
                 smp_info_ptr->entry     = (uint32_t)smp_loaded;
                 smp_info_ptr->gdt_ptr   = 0x600;
 
@@ -107,51 +109,51 @@ void smp_launch_cpus() {
 
                     if (smp_info_ptr->status > 0) {
                         if (smp_info_ptr->status == 1) {
-                            sprintf("[SMP] Core %u stuck on boot! Waiting...\n", id);
-                            sleep_no_task(1000);
+                            ser_printf("[SMP] Core %u stuck on boot! Waiting...\n", id);
+                            sleep_no_task(10);
                         }
 
                         if (smp_info_ptr->status == 2) {
-                            sprintf("[SMP] Core %u on configuration step! Waiting...\n", id);
-                            sleep_no_task(1000);
+                            ser_printf("[SMP] Core %u on configuration step! Waiting...\n", id);
+                            sleep_no_task(10);
                         }
 
                         if (smp_info_ptr->status == 3) {
-                            sprintf("[SMP] Core %u booted!\n", id);
+                            ser_printf("[SMP] Core %u booted!\n", id);
                         } else {
-                            sprintf("[SMP] Core %u failed to start.\n", id);
+                            ser_printf("[SMP] Core %u failed to start.\n", id);
                         }
                         break;
                     }
                 }
             }
         } else {
-            sprintf("[SMP] Core %u is BSP.\n", id);
+            ser_printf("[SMP] Core %u is BSP.\n", id);
         };
 
         id++;
     }
 
-    sprintf("[SMP] End initialization, %u cores booted\n", smp_boot_counter);
+    ser_printf("[SMP] End initialization, %u cores booted\n", smp_boot_counter);
 
-    vmm_unmap((void*)0, 2);
+    vmm_unmap((void*)0, 3);
+
+    return smp_boot_counter;
 }
 
 void smp_entry_point(SMPBootInfo_t* info) {
     apic_configure_ap();
 
-    init_core_locals(info->id);
-    sched_init_core();
+    init_core_locals();
     tss_init();
     idt_init();
 
-    asm volatile("int $0x80");
+    sched_init_core();
 
     info->status = 3;
 
-    get_core_locals()->state = CORE_ONLINE;
-
-    while (1) {
+    asm volatile("sti");
+    syscall0(2);
+    while(1)
         asm volatile("hlt");
-    }
 }

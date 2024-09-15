@@ -45,10 +45,18 @@ typedef struct {
     uint64_t        other_sdts[];
 } __attribute__((packed)) xsdt_t;
 
+typedef struct {
+    sdt_header_t header;
 
-uint32_t        get_ebda();
+    uint32_t    local_apic_addr;
+    uint32_t    apic_flags;
+    uint8_t     entries[];
+} __attribute__((packed)) madt_t;
+
 rsdp1_t*        get_rsdp1();
+madt_t*         get_madt();
+
 sdt_header_t*   get_root_sdt_header();
 sdt_header_t*   search_sdt_header(char* sig);
 
-uint32_t        acpi_init();
+bool            acpi_init();

@@ -1,8 +1,18 @@
 #include <mm/vmm.h>
 #include <mm/pmm.h>
 #include <int/isr.h>
+#include <sys/stack_trace.h>
+
+#define KERNEL_SPACE            (0x10000000)
+#define KERNEL_SPACE_TABLES     (KERNEL_SPACE >> 22)
 
 vmm_table_t* base_kernel_cr3 = 0;
+
+vmm_table_t __attribute__((aligned(PAGE_SIZE))) _base_dir     = { 0 };
+vmm_table_t __attribute__((aligned(PAGE_SIZE))) _base_table   = { 0 };
+
+vmm_table_t __attribute__((aligned(PAGE_SIZE))) _dir     = { 0 };
+vmm_table_t __attribute__((aligned(PAGE_SIZE))) _table   = { 0 };
 
 vmm_table_t* vmm_get_cr3() {
     vmm_table_t* ret;
@@ -10,11 +20,28 @@ vmm_table_t* vmm_get_cr3() {
     return ret;
 }
 
+vmm_table_t* vmm_replace_cr3(vmm_table_t* new) {
+    vmm_table_t* old;
+
+    if (!new)
+        return NULL;
+
+    asm volatile("mov %%cr3, %0;" : "=r"(old));
+
+    if (old == new)
+        return NULL;
+
+    // ser_printf("Replacing cr3 from 0x%08x to 0x%08x\n", old, new);
+
+    asm volatile("mov %0, %%cr3;" ::"r"(new) : "memory");
+    return old;
+}
+
 void vmm_set_cr3(vmm_table_t* new) {
     asm volatile("mov %0, %%cr3;" ::"r"(new) : "memory");
 }
 
-void vmm_invlpg(uint32_t new) {
+void vmm_invlpg(void* new) {
     asm volatile("invlpg (%0);" ::"r"(new) : "memory");
 }
 
@@ -40,37 +67,112 @@ void* vmm_offs_to_virt(vmm_table_off_t offs) {
     return (void*)addr;
 }
 
-vmm_table_t* traverse_table(vmm_table_t* page_dir, vmm_table_off_t offset) {
-    return (vmm_table_t*)(page_dir->entries[offset.tid].address << 12);
+void open_dir(vmm_table_t* page_dir) {
+    void* addr = (void*)&_dir;
+
+    vmm_table_off_t offset = vmm_virt_to_offs(addr);
+
+    if (_base_table.entries[offset.pid].address == (uint32_t)page_dir >> 12)
+        return;
+
+    _base_table.entries[offset.pid].raw = (uint32_t)page_dir | VMM_PRESENT | VMM_WRITE | VMM_USER;
+    vmm_invlpg(addr);
 }
 
-void* traverse_page(vmm_table_t* page_table, vmm_table_off_t offset) {
-    return (void*)(page_table->entries[offset.pid].address << 12);
+void open_table(vmm_table_t* page_table) {
+    void* addr = (void*)&_table;
+
+    vmm_table_off_t offset = vmm_virt_to_offs(addr);
+
+    if (_base_table.entries[offset.pid].address == (uint32_t)page_table >> 12)
+        return;
+
+    _base_table.entries[offset.pid].raw = (uint32_t)page_table | VMM_PRESENT | VMM_WRITE | VMM_USER;
+    vmm_invlpg(addr);
+}
+
+void close_dir() {
+    void* addr = (void*)&_dir;
+
+    vmm_table_off_t offset = vmm_virt_to_offs(addr);
+
+    if (_base_table.entries[offset.pid].address == (uint32_t)addr >> 12)
+        return;
+
+    _base_table.entries[offset.pid].raw = (uint32_t)addr | VMM_PRESENT | VMM_WRITE | VMM_USER;
+    vmm_invlpg(addr);
+}
+
+void close_table() {
+    void* addr = (void*)&_table;
+
+    vmm_table_off_t offset = vmm_virt_to_offs(addr);
+
+    if (_base_table.entries[offset.pid].address == (uint32_t)addr >> 12)
+        return;
+
+    _base_table.entries[offset.pid].raw = (uint32_t)addr | VMM_PRESENT | VMM_WRITE | VMM_USER;
+    vmm_invlpg(addr);
+}
+
+vmm_entry_t* traverse_dir_entry(vmm_table_off_t offset) {
+    return (vmm_entry_t*)(&_dir.entries[offset.tid]);
+}
+
+vmm_table_t* traverse_table(vmm_table_off_t offset) {
+    return (vmm_table_t*)(traverse_dir_entry(offset)->address << 12);
+}
+
+vmm_entry_t* traverse_table_entry(vmm_table_off_t offset) {
+    return (vmm_entry_t*)(&_table.entries[offset.pid]);
+}
+
+void* traverse_page(vmm_table_off_t offset) {
+    return (void*)(traverse_table_entry(offset)->address << 12);
 }
 
 void* virt_to_phys(void* virt, vmm_table_t* page_dir) {
     vmm_table_off_t offset = vmm_virt_to_offs(virt);
+    void* phys = (void*)0xFFFFFFFF;
 
-    if (page_dir->entries[offset.tid].present) {
-        vmm_table_t* page_table = traverse_table(page_dir, offset);
+    open_dir(page_dir);
 
-        if (page_table->entries[offset.pid].present)
-            return (void*)traverse_page(page_table, offset) + offset.off;
+    vmm_entry_t* dir_entry = traverse_dir_entry(offset);
+    if (dir_entry->present) {
+        vmm_table_t* page_table = traverse_table(offset);
+        open_table(page_table);
+        vmm_entry_t* table_entry = traverse_table_entry(offset);
+
+        if (table_entry->present)
+            phys = (void*)traverse_page(offset) + offset.off;
     }
 
-    return (void*)0xFFFFFFFF;
+    close_table();
+    close_dir();
+    return phys;
 }
 
-void vmm_ensure_table(vmm_table_t* page_dir, vmm_table_off_t offset) {
-    if (!page_dir->entries[offset.tid].present) {
+void ensure_table(vmm_table_off_t offset) {
+    vmm_entry_t* entry = traverse_dir_entry(offset);
+
+    if (!entry->present) {
         uint32_t new_table = (uint32_t)pmm_alloc(PAGE_SIZE);
 
-        memset((uint8_t*)new_table, 0, PAGE_SIZE);
-        page_dir->entries[offset.tid].raw = new_table | VMM_PRESENT | VMM_WRITE | VMM_USER;
+        open_table((vmm_table_t*)new_table);
+
+        for (uint32_t i = 0; i < 1024; i++)
+            _table.entries[i].raw = 0;
+
+        close_table();
+
+        entry->raw = new_table | VMM_PRESENT | VMM_WRITE | VMM_USER;
     }
 }
 
 uint8_t is_mapped(void* data, vmm_table_t* page_dir) {
+    if (!base_kernel_cr3)
+        return 0;
+
     return (uint32_t)virt_to_phys(data, page_dir) == 0xFFFFFFFF ? 0 : 1;
 }
 
@@ -97,25 +199,30 @@ int vmm_map_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t count,
     uint32_t cur_virt = ((uint32_t)virt) & VMM_4K_PERM_MASK;
     uint32_t cur_phys = ((uint32_t)phys) & VMM_4K_PERM_MASK;
 
+    open_dir(page_dir);
+
     for (uint32_t page = 0; page < count; page++) {
         vmm_table_off_t offset = vmm_virt_to_offs((void*)cur_virt);
 
-        vmm_ensure_table(page_dir, offset);
-        vmm_table_t* page_table = traverse_table(page_dir, offset);
-        vmm_entry_t* page = &page_table->entries[offset.pid];
+        ensure_table(offset);
+        vmm_table_t* page_table = traverse_table(offset);
+        open_table(page_table);
+        vmm_entry_t* table_entry = traverse_table_entry(offset);
 
-        if (!page->present) {
-            page->raw = cur_phys | (perms | VMM_PRESENT);
-            vmm_invlpg(cur_virt);
-            cur_phys += PAGE_SIZE;
-            cur_virt += PAGE_SIZE;
+        if (!table_entry->present) {
+            table_entry->raw = cur_phys | perms;
+            vmm_invlpg((void*)cur_virt);
         } else {
             ret = 1;
-            cur_phys += PAGE_SIZE;
-            cur_virt += PAGE_SIZE;
             continue;
         }
+
+        cur_phys += PAGE_SIZE;
+        cur_virt += PAGE_SIZE;
     }
+
+    close_table();
+    close_dir();
 
     return ret;
 }
@@ -126,18 +233,24 @@ int vmm_remap_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t coun
     uint32_t cur_virt = ((uint32_t)virt) & VMM_4K_PERM_MASK;
     uint32_t cur_phys = ((uint32_t)phys) & VMM_4K_PERM_MASK;
 
+    open_dir(page_dir);
+
     for (uint32_t page = 0; page < count; page++) {
         vmm_table_off_t offset = vmm_virt_to_offs((void*)cur_virt);
 
-        vmm_ensure_table(page_dir, offset);
-        vmm_table_t* page_table = traverse_table(page_dir, offset);
-        vmm_entry_t* page = &page_table->entries[offset.pid];
+        ensure_table(offset);
+        vmm_table_t* page_table = traverse_table(offset);
+        open_table(page_table);
+        vmm_entry_t* table_entry = traverse_table_entry(offset);
 
-        page->raw = cur_phys | (perms | VMM_PRESENT);
-        vmm_invlpg(cur_virt);
+        table_entry->raw = cur_phys | perms;
+        vmm_invlpg((void*)cur_virt);
         cur_phys += PAGE_SIZE;
         cur_virt += PAGE_SIZE;
     }
+
+    close_table();
+    close_dir();
 
     return ret;
 }
@@ -147,22 +260,28 @@ int vmm_unmap_pages(void* virt, vmm_table_t* page_dir, uint32_t count) {
 
     uint32_t cur_virt = ((uint32_t)virt) & VMM_4K_PERM_MASK;
 
+    open_dir(page_dir);
+
     for (uint32_t page = 0; page < count; page++) {
         vmm_table_off_t offset = vmm_virt_to_offs((void*)cur_virt);
 
-        vmm_ensure_table(page_dir, offset);
-        vmm_table_t* page_table = traverse_table(page_dir, offset);
-        vmm_entry_t* page = &page_table->entries[offset.pid];
+        ensure_table(offset);
+        vmm_table_t* page_table = traverse_table(offset);
+        open_table(page_table);
+        vmm_entry_t* table_entry = traverse_table_entry(offset);
 
-        if (!page->present) {
-            page->raw = 0;
+        if (table_entry->present) {
+            table_entry->raw = 0;
         } else {
             ret = 1;
         }
 
-        vmm_invlpg(cur_virt);
+        vmm_invlpg((void*)cur_virt);
         cur_virt += PAGE_SIZE;
     }
+
+    close_table();
+    close_dir();
 
     return ret;
 }
@@ -191,7 +310,7 @@ void vmm_enable_paging() {
 }
 
 void vmm_page_fault(core_locals_t* locals) {
-    core_regs_t* regs = &locals->irq_regs;
+    core_regs_t* regs = locals->irq_regs;
 
     uint32_t faddr;
     asm volatile("mov %%cr2, %0" : "=r" (faddr));
@@ -209,49 +328,114 @@ void vmm_page_fault(core_locals_t* locals) {
     }
 
     thread_t* thread = locals->current_thread;
-    thread->state = THREAD_TERMINATED;
 
-    isprintf("Page fault at 0x%08x (0x%08x, %s) on core %u (tid %d, in_irq %u)\n", regs->eip, faddr, err, locals->core_index, thread ? thread->tid : -1, locals->in_irq);
-    // print_stacktrace(&locals->irq_regs);
-    asm volatile("sti");
+    ser_printf("Page fault at 0x%08x (0x%08x, %s) on core %u (tid %d, in_irq %u)\n", regs->eip, faddr, err, locals->core_id, thread ? thread->tid : -1, locals->in_irq);
+    ser_printf("BASE CR3 0x%08x, ISR CR3 0x%08x", base_kernel_cr3, regs->cr3);
+    if (thread)
+        ser_printf(", THREAD CR3 0x%08x\n", thread->regs->cr3);
+    else
+        ser_printf("\n");
 
-    while (1)
-        asm volatile("hlt");
+    stack_trace(16);
+
+    if (thread)
+        thread->state = THREAD_TERMINATED;
+
+    locals->need_resched = true;
+//     asm volatile("sti");
+
+//     while (1)
+//         asm volatile("hlt");
 }
 
-void vmm_memory_setup(multiboot_mmap_t* mmap, uint32_t mmap_len) {
+void vmm_memory_setup(multiboot_memory_map_t* mmap, uint32_t mmap_len) {
     uint32_t kernel_start = (uint32_t)__kernel_start;
     uint32_t kernel_end = (uint32_t)__kernel_end;
 
-    vmm_table_t* page_dir = (vmm_table_t*)pmm_alloc(PAGE_SIZE);
-    memset((uint8_t*)page_dir, 0, PAGE_SIZE);
+    for (uint32_t i = 0; i < 1024; i++)
+        _base_dir.entries[i].raw = VMM_WRITE | VMM_USER;
 
-    // vmm_map_pages((void*)0xB8000, (void*)0xB8000, page_dir, 1, VMM_PRESENT | VMM_WRITE);
-    // vmm_map_pages((void*)kernel_start, (void*)kernel_start, page_dir, ALIGN(kernel_end - kernel_start) / PAGE_SIZE, VMM_PRESENT | VMM_WRITE);
+    for (uint32_t i = 0; i < 1024; i++)
+        _base_table.entries[i].raw = (i * PAGE_SIZE) | VMM_PRESENT | VMM_WRITE | VMM_USER;
 
-    vmm_map_pages((void*)0, (void*)0, page_dir, ALIGN(kernel_end) / PAGE_SIZE, VMM_PRESENT | VMM_WRITE);
+    _base_dir.entries[0].raw = (uint32_t)&_base_table | VMM_PRESENT | VMM_WRITE | VMM_USER;
 
-    vmm_set_cr3(page_dir);
+    base_kernel_cr3 = &_base_dir;
+
+    vmm_map_pages((void*)kernel_start, (void*)kernel_start, base_kernel_cr3, ALIGN(kernel_end - kernel_start) / PAGE_SIZE, VMM_PRESENT | VMM_WRITE | VMM_USER);
 
     register_int_handler(0x0E, vmm_page_fault);
 
+    vmm_set_cr3(base_kernel_cr3);
     vmm_enable_paging();
 
-    base_kernel_cr3 = vmm_get_cr3();
+    // vmm_map((void*)0xB8000, (void*)0xB8000, 1, VMM_PRESENT | VMM_WRITE | VMM_USER);
+
+    for (uint32_t i = 0; i < mmap_len; i++) {
+        if (mmap[i].type == MULTIBOOT_MEMORY_RESERVED && mmap[i].len > 0)
+            vmm_map((void*)(uint32_t)mmap[i].addr, (void*)(uint32_t)mmap[i].addr, ALIGN((uint32_t)mmap[i].len) / PAGE_SIZE, VMM_PRESENT | VMM_WRITE | VMM_USER);
+    }
 }
 
 void* vmm_fork_kernel_space() {
     interrupt_state_t state = interrupt_lock();
 
-    vmm_table_t* table0old = (vmm_table_t*)base_kernel_cr3;
-    vmm_table_t* table0new = (vmm_table_t*)pmm_alloc(PAGE_SIZE);
+    vmm_table_t* new_dir = (vmm_table_t*)pmm_alloc(PAGE_SIZE);
 
-    memset((uint8_t*)table0new, 0, PAGE_SIZE);
+    open_dir(new_dir);
 
-    for (uint32_t i = 0; i < 8; i++)
-        table0new->entries[i] = table0old->entries[i];
+    memset((uint8_t*)&_dir, 0, PAGE_SIZE);
+
+    for (uint32_t i = 0; i < 1024; i++)
+        if (base_kernel_cr3->entries[i].present)
+            _dir.entries[i].raw = base_kernel_cr3->entries[i].raw;
+
+    close_dir();
 
     interrupt_unlock(state);
 
-    return (void*)table0new;
+    return (void*)new_dir;
+}
+
+void vmm_free_cr3(vmm_table_t* table0) {
+    if (!table0 || table0 == base_kernel_cr3)
+        return;
+
+    interrupt_state_t state = interrupt_lock();
+
+    open_dir(table0);
+
+    vmm_table_off_t offset = { .tid = 0, .pid = 0, .off = 0 };
+
+    for (; offset.tid < 1024; offset.tid++) {
+        vmm_entry_t* dir_entry = traverse_dir_entry(offset);
+        vmm_entry_t* dir_entry_base = &base_kernel_cr3->entries[offset.tid];
+
+        if (dir_entry->present && dir_entry->raw != dir_entry_base->raw) {
+            vmm_table_t* table = traverse_table(offset);
+            vmm_table_t* table_base = (vmm_table_t*)(base_kernel_cr3->entries[offset.tid].address << 12);
+
+            open_table(table);
+
+            for (; offset.pid < 1024; offset.pid++) {
+                vmm_entry_t* table_entry = traverse_table_entry(offset);
+                vmm_entry_t* table_entry_base = &table_base->entries[offset.pid];
+
+                if (table_entry->present && table_entry->raw != table_entry_base->raw) {
+                    void* page = traverse_page(offset);
+
+                    uint32_t virt = (uint32_t)vmm_offs_to_virt(offset);
+                    ser_printf("Freeing page VIRT 0x%08x - PHYS 0x%08x\n", virt, page);
+                    pmm_unalloc(page, PAGE_SIZE);
+                }
+            }
+        }
+    }
+
+    close_table();
+    close_dir();
+
+    pmm_unalloc(table0, PAGE_SIZE);
+
+    interrupt_unlock(state);
 }

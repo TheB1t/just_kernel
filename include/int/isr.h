@@ -8,6 +8,8 @@ typedef void (*int_handler_t) (core_locals_t*);
 
 void register_int_handler(uint8_t n, int_handler_t handler);
 
+extern void isr_early();
+
 extern void isr0();
 extern void isr1();
 extern void isr2();

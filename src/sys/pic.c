@@ -45,8 +45,8 @@ void pic_sendEOI_slave() {
 }
 
 void pic_sendEOI(uint32_t isr) {
-	if (isr >= pic_master_offset && isr <= pic_slave_offset + 7) {
-		if (isr >= pic_slave_offset)
+	if ((uint32_t)isr >= pic_master_offset && isr <= (uint32_t)pic_slave_offset + 7) {
+		if ((uint32_t)isr >= pic_slave_offset)
 			pic_sendEOI_slave();
 
 		pic_sendEOI_master();

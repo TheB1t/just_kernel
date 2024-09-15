@@ -5,6 +5,7 @@
 #include <mm/vmm.h>
 
 #include <sys/smp.h>
+#include <sys/stack_trace.h>
 
 #include <proc/sched.h>
 
@@ -14,6 +15,10 @@ extern lock_t sprintf_lock;
 
 void* kmalloc(uint32_t size) {
     return (void*)heap_malloc(kernel_heap, size, 0);
+}
+
+void* kmalloc_a(uint32_t size) {
+    return (void*)heap_malloc(kernel_heap, size, 1);
 }
 
 void kfree(void* addr) {
@@ -27,49 +32,37 @@ void *kcalloc(uint32_t size) {
     return buffer;
 }
 
-void print_stacktrace(core_regs_t* regs) {
-  uint32_t* ebp = (uint32_t*)regs->ebp;
-
-  sprintf("Stack trace: \n");
-  sprintf("    0x%08x\n", regs->eip);
-  while (ebp) {
-    uint32_t eip = ebp[1];
-
-    sprintf("    0x%08x\n", eip);
-    ebp = (uint32_t*)ebp[0];
-  }
-}
-
 void panic(char *msg) {
     asm volatile("cli");
+
     static uint8_t panic_counter = 0;
 
     if (panic_counter++ == 0) {
         unlock(kprintf_lock);
         unlock(sprintf_lock);
 
-        sched_panic();
-
         kprintf("Kernel PANIC!!! [%s]\n", msg);
 
-        isprintf("eax = 0x%08x\n", get_core_locals()->irq_regs.eax);
-        isprintf("ebx = 0x%08x\n", get_core_locals()->irq_regs.ebx);
-        isprintf("ecx = 0x%08x\n", get_core_locals()->irq_regs.ecx);
-        isprintf("edx = 0x%08x\n", get_core_locals()->irq_regs.edx);
-        isprintf("esi = 0x%08x\n", get_core_locals()->irq_regs.esi);
-        isprintf("edi = 0x%08x\n", get_core_locals()->irq_regs.edi);
-        isprintf("ebp = 0x%08x\n", get_core_locals()->irq_regs.ebp);
-        isprintf("esp = 0x%08x\n", get_core_locals()->irq_regs.esp);
-        isprintf("eip = 0x%08x\n", get_core_locals()->irq_regs.eip);
-        isprintf("cs = 0x%04x\n", get_core_locals()->irq_regs.cs);
-        isprintf("ss = 0x%04x\n", get_core_locals()->irq_regs.ss);
-        isprintf("ds = 0x%04x\n", get_core_locals()->irq_regs.ds);
-        isprintf("eflags = 0x%08x\n", get_core_locals()->irq_regs.eflags);
+        core_locals_t* locals = get_core_locals();
+        if (locals && locals->in_irq) {
+            core_regs_t* regs = locals->irq_regs;
 
-        print_stacktrace(&get_core_locals()->irq_regs);
+            ser_printf("EAX: 0x%08x, EBX: 0x%08x, ECX 0x%08x\n", regs->eax, regs->ebx, regs->ecx);
+            ser_printf("EDX: 0x%08x, ESI: 0x%08x, EDI 0x%08x\n", regs->edx, regs->esi, regs->edi);
+            ser_printf("EBP: 0x%08x, ESP: 0x%08x, EIP 0x%08x\n", regs->ebp, regs->esp, regs->eip);
+            ser_printf("EFLAGS: 0x%08x\n", regs->eflags);
+            ser_printf("CS: 0x%04x, DS: 0x%04x\n", regs->cs, regs->ds);
+            ser_printf("User SS: 0x%04x, User ESP: 0x%08x\n", regs->user_ss, regs->user_esp);
+        } else {
+            ser_printf("Can't get panic context\n");
+        }
+
+        stack_trace(16);
+
+        sched_panic();
     } else if (panic_counter++ == 1) {
-        kprintf("DOUBLE PANIC!!!\n");
-    } // Otherwise just halt, because we falling in kprintf
+        ser_printf("DOUBLE PANIC!!!\n");
+    } // Otherwise just halt, because we falling in ser_printf
 
     while (1)
         asm volatile("hlt");

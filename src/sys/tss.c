@@ -10,8 +10,8 @@ void tss_init() {
 	core_locals_t* locals = get_core_locals();
 	tss_entry_t* tss_entry = &locals->tss_entry;
 
-	// tss_entry->ss0	= DESC_SEG(DESC_KERNEL_DATA, PL_RING3);
-	tss_entry->esp0	= (uint32_t)locals->irq_stack;
+	tss_entry->ss0	= DESC_SEG(DESC_KERNEL_DATA, PL_RING0);
+	tss_entry->esp0	= 0x0BAD0BAD;
 
 	/*
 		I think this is bad practice to use same TSS for each core.

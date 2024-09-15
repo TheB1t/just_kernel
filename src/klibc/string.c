@@ -13,7 +13,7 @@ void strcpy(char *src, char *dst) {
     *dst = '\0';
 }
 
-void strncpy(char *src, char *dst, int max) {
+void strncpy(char *src, char *dst, uint32_t max) {
     uint32_t len = strlen(src) + 1;
     len = len > max ? max : len;
 
@@ -33,8 +33,8 @@ int strcmp(char *s1, char *s2) {
     return 0;
 }
 
-int strncmp(char *s1, char *s2, int len) {
-    for (int i = 0; i < len; i++) {
+int strncmp(char *s1, char *s2, uint32_t len) {
+    for (uint32_t i = 0; i < len; i++) {
         if (s1[i] != s2[i]) return 1;
     }
     return 0;

@@ -149,6 +149,23 @@ static inline int list_empty(struct list_head *head)
 }
 
 /**
+* list_size - get the number of entries in list
+* @head: the list to get the size of
+*/
+static inline int list_size(struct list_head *head)
+{
+    int size = 0;
+    struct list_head *p = head->next;
+
+    while (p != head) {
+        size++;
+        p = p->next;
+    }
+
+    return size;
+}
+
+/**
 * list_entry - get the struct for this entry
 * @ptr: the &struct list_head pointer.
 * @type: the type of the struct this is embedded in.

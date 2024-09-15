@@ -19,19 +19,20 @@ void _vprintf(printf_putchar_t putchar, const char* format, va_list args) {
 	char padRight = 0;
     uint32_t v = 0;
 
-    if (!putchar)
+    if (!putchar) {
         return;
+	}
 
 	while ((c = *format++) != 0) {
 		padRight = 0;
 		sym = ' ';
 		num = 0;
-		
+
 		if (c != '%')
 			putchar(c);
 		else {
 			char* p;
-	
+
 			c = *format++;
 		back:
 			switch (c) {
@@ -41,7 +42,7 @@ void _vprintf(printf_putchar_t putchar, const char* format, va_list args) {
                     v = va_arg(args, unsigned int);
 					if (c == 'x')
 						htoa(v, buf);
-					else 
+					else
 						itoa(v, buf);
 					p = buf;
 					goto string;
@@ -53,26 +54,26 @@ void _vprintf(printf_putchar_t putchar, const char* format, va_list args) {
 
 				string:
 					if (num) {
-						num -= strlen(p) > num ? num : strlen(p);
+						num -= (char)strlen(p) > num ? num : (char)strlen(p);
 						if (!padRight)
 							while (num--)
 								putchar(sym);
 					}
-					
+
 					while (*p)
 						putchar(*p++);
 
 					if (num && padRight)
 						while (num--)
 							putchar(sym);
-								
+
 					break;
 
 				case 'c':
                     v = va_arg(args, unsigned int);
 					putchar((char)v);
                     break;
-				
+
 				default:
 					if (*(format - 2) == '%') {
 						if (c == '0' || c == ' ' || c == '.') {

@@ -1,15 +1,17 @@
 #include <proc/sched.h>
+#include <proc/syscalls.h>
+#include <drivers/pit.h>
 #include <int/isr.h>
 #include <sys/smp.h>
 #include <mm/pmm.h>
 #include <mm/vmm.h>
 #include <klibc/lock.h>
 
-#define add_thread(thread)      assert((uint32_t)thread != 0xFFFFFFF8); list_add_tail(THREAD_LIST(thread), THREAD_HEAD(&thread_list))
-#define del_thread(thread)      assert((uint32_t)thread != 0xFFFFFFF8); list_del(THREAD_LIST(thread))
+#define add_thread(thread)      list_add_tail(THREAD_LIST(thread), THREAD_HEAD(&thread_list))
+#define del_thread(thread)      list_del_init(THREAD_LIST(thread))
 
-#define add_proc(proc)          assert((uint32_t)proc != 0xFFFFFFF8); list_add_tail(PROC_LIST(proc), PROC_HEAD(&proc_list))
-#define del_proc(proc)          assert((uint32_t)proc != 0xFFFFFFF8); list_del(PROC_LIST(proc))
+#define add_proc(proc)          list_add_tail(PROC_LIST(proc), PROC_HEAD(&proc_list))
+#define del_proc(proc)          list_del_init(PROC_LIST(proc))
 
 #define have_thread()           (!list_empty(THREAD_HEAD(&thread_list)))
 #define have_proc()             (!list_empty(PROC_HEAD(&proc_list)))
@@ -33,190 +35,209 @@ void sched_unlock() {
 }
 
 void sched_panic() {
-    sprintf("Core %u in panic (cause)!\n", get_core_locals()->core_index);
+    ser_printf("[SCHED] Core %u in panic (cause)!\n", get_core_locals()->core_id);
 
-    smp_send_global_interrupt(0xF2);
+    smp_send_global_interrupt(0xF1);
 }
 
-static inline uint16_t get_fcw() {
-    uint16_t buf;
-    asm volatile("fnstcw (%0)" :: "r"(&buf) : "memory");
-    return buf;
+void remove_terminated_threads() {
+    struct list_head* iter;
+
+    for_each_thread(iter, thread_list) {
+        thread_t* thread = entry_thread(iter);
+
+        assert(thread != NULL);
+
+        if (thread->state == THREAD_TERMINATED) {
+            del_thread(thread);
+            thread_free(thread);
+        }
+    }
 }
 
-static inline void set_fcw(uint16_t buf) {
-    asm volatile("fldcw (%0)" :: "r"(&buf) : "memory");
+void remove_terminated_processes() {
+    struct list_head* iter;
+
+    for_each_process(iter, proc_list) {
+        process_t* proc = entry_process(iter);
+
+        assert(proc != NULL);
+
+        if (proc_have_thread(proc))
+            continue;
+
+        del_proc(proc);
+    }
 }
 
-static inline uint32_t get_mxcsr() {
-    uint32_t buf;
-    asm volatile("stmxcsr (%0)" :: "r"(&buf) : "memory");
-    return buf;
+void update_sleeping_threads(core_locals_t* locals) {
+    if (locals->core_id != 0)
+        return;
+
+    struct list_head* iter;
+
+    for_each_thread(iter, thread_list) {
+        thread_t* thread = entry_thread(iter);
+
+        if (thread->state == THREAD_SLEEPING) {
+            thread->sleep_time -= PIT_SPEED_US > thread->sleep_time ? thread->sleep_time : PIT_SPEED_US;
+
+            if (!thread->sleep_time)
+                thread->state = THREAD_STOPPED;
+        }
+    }
 }
 
-static inline void set_mxcsr(uint32_t buf) {
-    asm volatile("ldmxcsr (%0)" :: "r"(&buf) : "memory");
-}
+thread_t* pick_thread(core_locals_t* locals) {
+    struct list_head* iter;
 
-void save_context(thread_t* thread, core_regs_t* regs) {
-    thread->regs.eax    = regs->eax;
-    thread->regs.ebx    = regs->ebx;
-    thread->regs.ecx    = regs->ecx;
-    thread->regs.edx    = regs->edx;
-    thread->regs.ebp    = regs->ebp;
-    thread->regs.edi    = regs->edi;
-    thread->regs.esi    = regs->esi;
+    thread_t* picked_thread = NULL;
+    uint32_t min_priority = 0xFFFFFFFF;
 
-    thread->regs.eip    = regs->eip;
-    thread->regs.cs     = regs->cs;
-    thread->regs.eflags = regs->eflags;
+    for_each_thread(iter, thread_list) {
+        thread_t* thread = entry_thread(iter);
+        if (thread->cpu == -1 || thread->cpu == locals->core_id) {
+            switch (thread->state) {
+                case THREAD_STOPPED: {
+                    if (thread->priority < min_priority) {
+                        picked_thread = thread;
+                        min_priority = thread->priority;
+                    }
+                } break;
 
-    thread->regs.esp = regs->esp;
-    thread->regs.ss  = regs->ss;
-
-    if (thread->ring == 3) {
-        thread->regs.esp = regs->esp0;
-        thread->regs.ss  = regs->ss0;
+                case THREAD_RUNNING:
+                case THREAD_SLEEPING:
+                case THREAD_TERMINATED:
+                default:
+                    break;
+            }
+        }
     }
 
-    // asm volatile("fxsave %0;"::"m"(thread->sse_region));
-
-    thread->regs.mxcsr  = get_mxcsr();
-    thread->regs.fcw    = get_fcw();
+    return picked_thread;
 }
 
-void load_context(thread_t* thread, core_regs_t* regs) {
-    regs->eax    = thread->regs.eax;
-    regs->ebx    = thread->regs.ebx;
-    regs->ecx    = thread->regs.ecx;
-    regs->edx    = thread->regs.edx;
-    regs->ebp    = thread->regs.ebp;
-    regs->edi    = thread->regs.edi;
-    regs->esi    = thread->regs.esi;
+void save_thread(core_locals_t* locals, thread_t* thread, thread_state_t state) {
+    assert(thread != NULL);
 
-    regs->eip    = thread->regs.eip;
-    regs->cs     = thread->regs.cs;
-    regs->eflags = thread->regs.eflags;
-    regs->cr3    = thread->regs.cr3;
+    thread->state = state;
+    thread->regs = locals->irq_regs;
+    // asm volatile("fxsave %0;" : : "m" (*thread->sse_region));
+}
 
-    regs->esp   = thread->regs.esp;
-    regs->ss    = thread->regs.ss;
+void load_thread(core_locals_t* locals, thread_t* thread) {
+    assert(thread != NULL);
 
-    if (thread->ring == 3) {
-        regs->esp0 = thread->regs.esp;
-        regs->ss0  = thread->regs.ss;
-    }
+    // ser_printf("[%u][%s:%u] Picked\n", locals->core_id, thread->parent->name, thread->tid);
 
-    // asm volatile("fxrstor %0;"::"m"(thread->sse_region));
-    // write_msr(0xC0000100, thread->regs.fs);
+    if (locals->state == CORE_IDLE)
+        locals->state = CORE_ONLINE;
 
-    set_mxcsr(thread->regs.mxcsr);
-    set_fcw(thread->regs.fcw);
+    locals->current_thread = thread;
+    locals->irq_regs = thread->regs;
+    // asm volatile("fxrstor %0;" : : "m" (*thread->sse_region));
+
+    thread->state = THREAD_RUNNING;
+    set_kernel_stack(thread->kernel_stack);
+}
+
+void enter_idle(core_locals_t* locals) {
+    assert(locals->current_thread == NULL);
+
+    locals->state = CORE_IDLE;
+    locals->current_thread = NULL;
+    locals->irq_regs = locals->idle_thread->regs;
+    set_kernel_stack(locals->idle_thread->kernel_stack);
+
+    // ser_printf("[%u] Idle\n", locals->core_id);
 }
 
 void _sched(core_locals_t* locals) {
     if (locals->state == CORE_OFFLINE)
         return;
 
-    struct list_head* iter;
-    thread_t* thread = locals->current_thread;
-    thread_t* picked_thread = NULL;
-
-    // isprintf("[%u] Thread list (c 0x%08x):\n", locals->core_index, thread);
+    // ser_printf("[%u] Thread list (c 0x%08x):\n", locals->core_id, thread);
     // if (have_thread()) {
     //     for_each_thread(iter, thread_list) {
     //         thread_t* thread = entry_thread(iter);
 
-    //         isprintf("[%u] 0x%08x: %s:%u:%u\n", locals->core_index, thread, thread->parent->name, thread->tid, thread->state);
+    //         ser_printf("[%u] 0x%08x: %s:%u:%u\n", locals->core_id, thread, thread->parent->name, thread->tid, thread->state);
     //     }
     // } else {
-    //     isprintf("[%u] Empty\n", locals->core_index);
+    //     ser_printf("[%u] Empty\n", locals->core_id);
     // }
 
-    for_each_thread(iter, thread_list) {
-        thread_t* t = entry_thread(iter);
+    update_sleeping_threads(locals);
 
-        assert(t != NULL);
+    thread_t* new_thread = pick_thread(locals);
 
-        if (t->state == THREAD_STOPPED && (t->cpu == -1 || t->cpu == locals->core_index)) {
-            picked_thread = t;
-            break;
+    switch (locals->state) {
+        case CORE_ONLINE: {
+            assert(locals->current_thread != NULL);
+
+            switch (locals->current_thread->state) {
+                case THREAD_RUNNING: {
+                    if (!new_thread)
+                        return;
+
+                    save_thread(locals, locals->current_thread, THREAD_STOPPED);
+                    load_thread(locals, new_thread);
+                } break;
+
+                case THREAD_TERMINATED: {
+                    ser_printf("[%u][%s:%u] Terminated with exitcode 0x%08x\n", locals->core_id, locals->current_thread->parent->name, locals->current_thread->tid, locals->current_thread->exitcode);
+
+                    locals->current_thread = NULL;
+                    if (!new_thread)
+                        enter_idle(locals);
+                    else
+                        load_thread(locals, new_thread);
+                } break;
+
+                case THREAD_SLEEPING: {
+                    save_thread(locals, locals->current_thread, THREAD_SLEEPING);
+                    locals->current_thread = NULL;
+
+                    if (!new_thread)
+                        enter_idle(locals);
+                    else
+                        load_thread(locals, new_thread);
+                } break;
+            }
+        } break;
+
+        case CORE_IDLE:{
+            assert(locals->current_thread == NULL);
+
+            if (!new_thread)
+                return;
+
+            load_thread(locals, new_thread);
+        } break;
+
+        case CORE_BOOTING: {
+            assert(locals->current_thread == NULL);
+
+            enter_idle(locals);
+        } break;
+
+        default: {
+            panic("Unknown core state!\n");
         }
-    }
-
-    if (thread) {
-        switch (thread->state) {
-            case THREAD_RUNNING:
-                if (!picked_thread)
-                    return;
-
-                save_context(thread, &locals->irq_regs);
-
-                if (thread->regs.ebp == 0xDEADDEAD)
-                    thread->state = THREAD_TERMINATED;
-                else {
-                    thread->state = THREAD_STOPPED;
-                    // isprintf("[%u][%s:%u] Stopped\n", locals->core_index, thread->parent->name, thread->tid);
-                    goto switch_thread;
-                }
-
-            case THREAD_TERMINATED:
-                isprintf("[%u][%s:%u] Terminated\n", locals->core_index, thread->parent->name, thread->tid);
-                locals->current_thread = NULL;
-                break;
-
-            switch_thread:
-            default:
-                add_thread(thread);
-                locals->current_thread = NULL;
-                break;
-        }
-    }
-
-    if (picked_thread) {
-        // isprintf("[%u][%s:%u] Picked\n", locals->core_index, picked_thread->parent->name, picked_thread->tid);
-
-        thread = picked_thread;
-
-        thread->state = THREAD_RUNNING;
-
-        del_thread(thread);
-        load_context(thread, &locals->irq_regs);
-
-        locals->state = CORE_ONLINE;
-        locals->current_thread = thread;
-
-        // isprintf("[%u][%s:%u] Started\n", locals->core_index, thread->parent->name, thread->tid);
-    } else if (!locals->current_thread && locals->state != CORE_IDLE) {
-        assert(locals->idle_thread != NULL);
-
-        locals->state = CORE_IDLE;
-        load_context(locals->idle_thread, &locals->irq_regs);
-
-        // isprintf("[%u] Idle\n", locals->core_index);
     }
 }
 
 void _sched_runner(core_locals_t* locals) {
     check_and_lock(_sched_lock)
         _sched(locals);
-        unlock(_sched_lock);
-    } else {
-        // if (locals->current_thread)
-        //     isprintf("Task %u on core %u overrunning\n", locals->current_thread->tid, locals->core_index);
-        // else if (locals->state == CORE_IDLE)
-        //     isprintf("Core %u overrunning in IDLE state (?)\n", locals->core_index);
-    }
-}
-
-void _idle() {
-    while (1) {
-        asm volatile("hlt");
+        // remove_terminated_threads();
+        // remove_terminated_processes();
+        sched_unlock();
     }
 }
 
 void _panic(core_locals_t* locals) {
-    isprintf("Core %u in panic (indirect)!\n", locals->core_index);
+    ser_printf("Core %u in panic (indirect)!\n", locals->core_id);
     locals->state = CORE_OFFLINE;
 
     _idle();
@@ -255,6 +276,7 @@ void sched_run_proc(process_t* proc) {
     struct list_head* iter;
     for_each_process_thread(iter, proc) {
         thread_t* thread = entry_process_thread(iter);
+        assert(thread->state == THREAD_STOPPED);
         add_thread(thread);
     }
 
@@ -263,39 +285,64 @@ void sched_run_proc(process_t* proc) {
 }
 
 void sched_init_core() {
-    get_core_locals()->idle_thread = thread_create(idle_proc, _idle);
+    core_locals_t* locals = get_core_locals();
+
+    locals->idle_thread = thread_create(idle_proc, _idle);
+    locals->current_thread = NULL;
+    locals->state = CORE_BOOTING;
+}
+
+void sched_thread_exit(uint32_t code) {
+    core_locals_t* locals = get_core_locals();
+
+    if (locals->current_thread) {
+        locals->current_thread->exitcode = code;
+        locals->current_thread->state = THREAD_TERMINATED;
+        _sched(locals);
+    }
+}
+
+void sched_thread_sleep(uint32_t time_ms) {
+    core_locals_t* locals = get_core_locals();
+
+    if (locals->current_thread) {
+        locals->current_thread->sleep_time = time_ms * 1000;
+        locals->current_thread->state = THREAD_SLEEPING;
+        _sched(locals);
+    }
+}
+
+void sched_thread_yield() {
+    core_locals_t* locals = get_core_locals();
+
+    _sched_runner(locals);
 }
 
 void sched_init(void* entry) {
     interrupt_state_t state = interrupt_lock();
 
-    core_locals_t* locals = get_core_locals();
-
-    sprintf("[SCHED] Initializing scheduler...\n");
+    ser_printf("[SCHED] Initializing scheduler...\n");
     INIT_LIST_HEAD(PROC_HEAD(&proc_list));
     INIT_LIST_HEAD(THREAD_HEAD(&thread_list));
 
     register_int_handler(0xF0, _sched_runner);
-    register_int_handler(0xF1, _sched_all);
-    register_int_handler(0xF2, _panic);
+    register_int_handler(0xF1, _panic);
 
-    kernel_proc = proc_create("_kernel", entry, 0);
-    idle_proc   = proc_create("_idle", _idle, 0);
+    syscalls_set(0, (void*)sched_thread_exit);
+    syscalls_set(1, (void*)sched_thread_sleep);
+    syscalls_set(2, (void*)sched_thread_yield);
 
-    thread_t* thread    = get_main_thread(kernel_proc);
-    thread->cpu         = -1;
+    kernel_proc = proc_create_kernel("_kernel", 0);
+    idle_proc   = proc_create_kernel("_idle", 0);
 
-    locals->idle_thread = get_main_thread(idle_proc);
+    thread_create(kernel_proc, entry);
 
-    sprintf("[SCHED] Scheduler initialized\n");
+    ser_printf("[SCHED] Scheduler initialized\n");
 
     interrupt_unlock(state);
 }
 
 void sched_run() {
-    interrupt_state_t state = interrupt_lock();
-
     sched_run_proc(kernel_proc);
-
-    interrupt_unlock(state);
+    syscall0(2);
 }

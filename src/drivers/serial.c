@@ -1,33 +1,40 @@
 #include <drivers/serial.h>
 #include <klibc/lock.h>
+#include <sys/smp.h>
 
 lock_t sprintf_lock		= INIT_LOCK(sprintf_lock);
 lock_t irq_sprintf_lock	= INIT_LOCK(irq_sprintf_lock);
 
 uint16_t _active_port = 0;
 
-void sprintf(const char* format, ...) {
+void ser_printf(const char* format, ...) {
 	if (!_active_port)
 		return;
 
+	core_locals_t* locals = get_core_locals();
+	if (!locals)
+		goto generic;
+
+	if (!is_mapped((void*)locals, vmm_get_cr3()))
+		goto generic;
+
+	if (locals->in_irq) {
+		lock(irq_sprintf_lock);
+		va_list va;
+		va_start(va, format);
+		_vprintf(serial_writeChar, format, va);
+		va_end(va);
+		unlock(irq_sprintf_lock);
+		return;
+	}
+
+generic:
 	lock(sprintf_lock);
-    va_list va;
-    va_start(va, format);
-    _vprintf(serial_writeChar, format, va);
-    va_end(va);
-	unlock(sprintf_lock);	
-}
-
-void isprintf(const char* format, ...) {
-	if (!_active_port)
-		return;
-
-	lock(irq_sprintf_lock);
-    va_list va;
-    va_start(va, format);
-    _vprintf(serial_writeChar, format, va);
-    va_end(va);
-	unlock(irq_sprintf_lock);	
+	va_list va;
+	va_start(va, format);
+	_vprintf(serial_writeChar, format, va);
+	va_end(va);
+	unlock(sprintf_lock);
 }
 
 int32_t serial_init(uint16_t port, uint16_t baud) {
@@ -41,8 +48,9 @@ int32_t serial_init(uint16_t port, uint16_t baud) {
 	port_outb(port + UART_MCR,		0x1E);						// Set in loopback mode, test the serial chip
 	port_outb(port + UART_MCR,		0x0F);
 
-    if (!_active_port)
+    if (!_active_port) {
         _active_port = port;
+	}
 
 	return 0;
 }
@@ -54,7 +62,7 @@ int32_t serial_recived(uint16_t port) {
 int serial_isTransmitEmpty(uint16_t port) {
 	return port_inb(port + UART_LSR) & 0x20;
 }
- 
+
 char serial_readChar() {
    while (serial_recived(_active_port) == 0);
    return port_inb(_active_port);
@@ -70,10 +78,13 @@ uint32_t serial_readString(char* str) {
 	}
 	return readed;
 }
- 
+
 void serial_writeChar(char c) {
 	while (serial_isTransmitEmpty(_active_port) == 0);
 	port_outb(_active_port, c);
+
+	if (c == '\n')
+		serial_writeChar('\r');
 }
 
 uint32_t serial_writeString(char* str) {
@@ -84,5 +95,5 @@ uint32_t serial_writeString(char* str) {
 		if (c == '\0')
 			break;
 	}
-	return writed;	
+	return writed;
 }

@@ -43,8 +43,9 @@ typedef struct {
 
 
 vmm_table_t* vmm_get_cr3();
+vmm_table_t* vmm_replace_cr3(vmm_table_t* new);
 void vmm_set_cr3(vmm_table_t* new);
-void vmm_invlpg(uint32_t new);
+void vmm_invlpg(void* new);
 
 vmm_table_off_t vmm_virt_to_offs(void* virt);
 void* vmm_offs_to_virt(vmm_table_off_t offs);
@@ -63,5 +64,6 @@ int vmm_remap(void* phys, void* virt, uint32_t count, uint16_t perms);
 int vmm_unmap(void* virt, uint32_t count);
 
 void* vmm_virt_to_phys(void* virt);
-void vmm_memory_setup(multiboot_mmap_t* mmap, uint32_t mmap_len);
+void vmm_memory_setup(multiboot_memory_map_t* mmap, uint32_t mmap_len);
 void* vmm_fork_kernel_space();
+void vmm_free_cr3(vmm_table_t* table0);
