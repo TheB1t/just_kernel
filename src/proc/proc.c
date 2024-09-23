@@ -22,7 +22,7 @@ process_t* proc_alloc(const char* name, uint8_t ring) {
             proc->cr3 = vmm_fork_kernel_space();
 
             vmm_table_t* old_cr3 = vmm_replace_cr3(proc->cr3);
-            createHeap((uint32_t)proc->heap, (uint32_t)proc->cr3, 0x50000000, HEAP_MIN_SIZE, 0x50000000 + (HEAP_MIN_SIZE * 2), VMM_WRITE | VMM_USER);
+            createHeap((uint32_t)proc->heap, (uint32_t)proc->cr3, 0x50000000, HEAP_MIN_SIZE, 0x50000000 + (HEAP_MIN_SIZE * 2), VMM_PRESENT | VMM_WRITE | VMM_USER);
             vmm_replace_cr3(old_cr3);
         } else {
             proc->cr3 = base_kernel_cr3;

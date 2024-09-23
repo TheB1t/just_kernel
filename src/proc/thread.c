@@ -13,10 +13,9 @@ thread_t* thread_alloc() {
     if (thread) {
         memset((uint8_t*)thread, 0, sizeof(thread_t));
         thread->kernel_stack    = (uint32_t)(kmalloc_a(PAGE_SIZE) + PAGE_SIZE);
-        thread->regs            = (core_regs_t*)(thread->kernel_stack - sizeof(core_regs_t));
-        thread->sse_region      = (sse_region_t*)kmalloc_a(sizeof(sse_region_t));
-        memset((uint8_t*)thread->regs, 0, sizeof(core_regs_t));
-        memset((uint8_t*)thread->sse_region, 0, sizeof(sse_region_t));
+        thread->regs            = (core_regs_t*)(thread->kernel_stack - sizeof(core_regs_base_t));
+        // thread->sse_region      = (sse_region_t*)kmalloc_a(sizeof(sse_region_t));
+        // memset((uint8_t*)thread->sse_region, 0, sizeof(sse_region_t));
     }
 
     return thread;
@@ -44,29 +43,31 @@ thread_t* thread_create(process_t* proc, void* entry) {
 
     if (thread) {
         if (proc->ring == 3) {
+            thread->regs            = (core_regs_t*)((uint32_t)(thread->regs) - sizeof(core_regs_user_t));
+
             vmm_table_t* old_cr3 = vmm_replace_cr3(proc->cr3);
             thread->user_stack      = heap_malloc(proc->heap, PAGE_SIZE, 1) + PAGE_SIZE;
             vmm_replace_cr3(old_cr3);
 
-            thread->regs->cs        = DESC_SEG(DESC_USER_CODE, PL_RING3);
-            thread->regs->ds        = DESC_SEG(DESC_USER_DATA, PL_RING3);
-            thread->regs->user_ss   = thread->regs->ds;
-            thread->regs->user_esp  = (uint32_t)thread->user_stack;
+            thread->regs->base.cs   = DESC_SEG(DESC_USER_CODE, PL_RING3);
+            thread->regs->base.ds   = DESC_SEG(DESC_USER_DATA, PL_RING3);
+            thread->regs->user.ss   = thread->regs->base.ds;
+            thread->regs->user.esp  = (uint32_t)thread->user_stack;
         } else {
             thread->user_stack      = 0;
 
-            thread->regs->cs        = DESC_SEG(DESC_KERNEL_CODE, PL_RING0);
-            thread->regs->ds        = DESC_SEG(DESC_KERNEL_DATA, PL_RING0);
+            thread->regs->base.cs   = DESC_SEG(DESC_KERNEL_CODE, PL_RING0);
+            thread->regs->base.ds   = DESC_SEG(DESC_KERNEL_DATA, PL_RING0);
         }
 
-        thread->tid             = next_tid++;
-        thread->state           = THREAD_STOPPED;
-        thread->parent          = proc;
-        thread->cpu             = -1;
-        thread->regs->eip       = (uint32_t)entry;
-        thread->regs->cr3       = (uint32_t)proc->cr3;
-        thread->regs->esp       = (uint32_t)thread->kernel_stack;
-        thread->regs->eflags    = 0x202;
+        thread->tid                 = next_tid++;
+        thread->state               = THREAD_STOPPED;
+        thread->parent              = proc;
+        thread->cpu                 = -1;
+        thread->regs->base.eip      = (uint32_t)entry;
+        thread->regs->base.cr3      = (uint32_t)proc->cr3;
+        thread->regs->base.esp      = (uint32_t)thread->kernel_stack;
+        thread->regs->base.eflags   = 0x202;
 
         add_thread2proc(proc, thread);
     }

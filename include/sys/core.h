@@ -39,4 +39,5 @@ typedef struct {
     idt_ptr_t   idt_entries_ptr;
     idt_entry_t idt_entries[IDT_ENTRIES];
     tss_entry_t tss_entry;
+    uint8_t     tss_bitmap[8192];   // This MUST be after tss_entry and EXACTLY 8192 bytes long
 } __attribute__((packed)) core_locals_t;

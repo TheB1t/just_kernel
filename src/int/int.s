@@ -1,18 +1,6 @@
 [BITS 32]
 [EXTERN isr_handler]
 
-struc CORE_LOCALS
-    ._flags:            resb 1
-
-    ._irq_regs:         resd 1
-    ._state:            resd 1
-
-    ._current_thread:   resd 1
-    ._idle_thread:      resd 1
-
-    ._core_id:          resb 1
-endstruc
-
 %macro isr 1
 [GLOBAL isr%1]
 type isr%1 function
@@ -30,26 +18,6 @@ isr%1:
     cli
     push %1
     jmp isr_common
-%endmacro
-
-%macro set_flag 1
-    mov eax, [gs:CORE_LOCALS._flags]
-    bts eax, %1
-    mov [gs:CORE_LOCALS._flags], eax
-%endmacro
-
-%macro clear_flag 1
-    mov eax, [gs:CORE_LOCALS._flags]
-    btr eax, %1
-    mov [gs:CORE_LOCALS._flags], eax
-%endmacro
-
-%macro save_ctx 0
-    mov [gs:CORE_LOCALS._irq_regs], esp
-%endmacro
-
-%macro load_ctx 0
-    mov esp, [gs:CORE_LOCALS._irq_regs]
 %endmacro
 
 %macro save_regs 0
@@ -82,17 +50,11 @@ isr%1:
 %endmacro
 
 %macro switch_seg 0
-    mov ecx, 0xC0000101
-    rdmsr
-
     mov ebx, 0x10
     mov ds, bx
     mov es, bx
     mov fs, bx
     mov gs, bx
-
-    mov ecx, 0xC0000101
-    wrmsr
 %endmacro
 
 %macro breakpoint 0
@@ -105,23 +67,11 @@ type isr_common function
 isr_common:
     save_regs
     switch_seg
-    set_flag 0
 
-    jz .not_nested
-    set_flag 1
-.not_nested:
-
-    save_ctx
-
+    push esp
     cld
     call isr_handler
-
-    load_ctx
-    clear_flag 1
-
-    jnz .nested
-    clear_flag 0
-.nested:
+    pop esp
 
     restore_regs
     add esp, 8

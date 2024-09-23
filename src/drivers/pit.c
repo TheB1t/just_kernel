@@ -7,7 +7,9 @@ extern void _sched_all(core_locals_t* locals);
 
 void timer_handler(core_locals_t* locals) {
     global_ticks++;
-    _sched_all(locals);
+
+    if ((global_ticks % 8) == 0)
+        _sched_all(locals);
 }
 
 void pit_set_freq() {
@@ -28,8 +30,15 @@ void pit_init() {
     pit_set_freq();
 }
 
-void sleep_no_task(uint32_t ticks) {
+void sleep_no_task(uint32_t ms) {
+    if (!ms)
+        return;
+
     volatile uint32_t start_ticks = global_ticks;
+    volatile uint32_t ticks = (ms * 1000) / PIT_SPEED_US;
+
+    ticks = ticks ? ticks : 1;
+
     while (global_ticks < ticks + start_ticks)
         asm volatile("pause");
 }

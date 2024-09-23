@@ -317,22 +317,22 @@ void vmm_page_fault(core_locals_t* locals) {
 
     char* err = "Unknown error";
 
-    if (!(regs->int_err & 0x1)) {
+    if (!(regs->base.int_err & 0x1)) {
     	err = "Page not present";
-	} else if (regs->int_err & 0x2) {
+	} else if (regs->base.int_err & 0x2) {
     	err = "Page is read-only";
-	} else if (regs->int_err & 0x4) {
+	} else if (regs->base.int_err & 0x4) {
     	err = "Processor in user-mode";
-    } else if (regs->int_err & 0x8) {
+    } else if (regs->base.int_err & 0x8) {
     	err = "Overwrite CPU-reserved bits";
     }
 
     thread_t* thread = locals->current_thread;
 
-    ser_printf("Page fault at 0x%08x (0x%08x, %s) on core %u (tid %d, in_irq %u)\n", regs->eip, faddr, err, locals->core_id, thread ? thread->tid : -1, locals->in_irq);
-    ser_printf("BASE CR3 0x%08x, ISR CR3 0x%08x", base_kernel_cr3, regs->cr3);
+    ser_printf("Page fault at 0x%08x (0x%08x, %s) on core %u (tid %d, in_irq %u)\n", regs->base.eip, faddr, err, locals->core_id, thread ? thread->tid : -1, locals->in_irq);
+    ser_printf("BASE CR3 0x%08x, ISR CR3 0x%08x", base_kernel_cr3, regs->base.cr3);
     if (thread)
-        ser_printf(", THREAD CR3 0x%08x\n", thread->regs->cr3);
+        ser_printf(", THREAD CR3 0x%08x\n", thread->regs->base.cr3);
     else
         ser_printf("\n");
 
@@ -352,6 +352,9 @@ void vmm_memory_setup(multiboot_memory_map_t* mmap, uint32_t mmap_len) {
     uint32_t kernel_start = (uint32_t)__kernel_start;
     uint32_t kernel_end = (uint32_t)__kernel_end;
 
+    (void)mmap;
+    (void)mmap_len;
+
     for (uint32_t i = 0; i < 1024; i++)
         _base_dir.entries[i].raw = VMM_WRITE | VMM_USER;
 
@@ -369,12 +372,10 @@ void vmm_memory_setup(multiboot_memory_map_t* mmap, uint32_t mmap_len) {
     vmm_set_cr3(base_kernel_cr3);
     vmm_enable_paging();
 
-    // vmm_map((void*)0xB8000, (void*)0xB8000, 1, VMM_PRESENT | VMM_WRITE | VMM_USER);
-
-    for (uint32_t i = 0; i < mmap_len; i++) {
-        if (mmap[i].type == MULTIBOOT_MEMORY_RESERVED && mmap[i].len > 0)
-            vmm_map((void*)(uint32_t)mmap[i].addr, (void*)(uint32_t)mmap[i].addr, ALIGN((uint32_t)mmap[i].len) / PAGE_SIZE, VMM_PRESENT | VMM_WRITE | VMM_USER);
-    }
+    // for (uint32_t i = 0; i < mmap_len; i++) {
+    //     if (mmap[i].type == MULTIBOOT_MEMORY_RESERVED && mmap[i].len > 0)
+    //         vmm_map((void*)(uint32_t)mmap[i].addr, (void*)(uint32_t)mmap[i].addr, ALIGN((uint32_t)mmap[i].len) / PAGE_SIZE, VMM_PRESENT | VMM_WRITE | VMM_USER);
+    // }
 }
 
 void* vmm_fork_kernel_space() {

@@ -3,6 +3,8 @@ PROJECT(kernel)
 
 FIND_PROGRAM(CMAKE_ASM_NASM_COMPILER NAMES yasm)
 
+# add_compile_definitions(V86_LOGGING)
+
 SET(USE_CROSS_COMPILE TRUE)
 SET(CMAKE_FIND_ROOT_PATH  $ENV{HOME}/projects/justanotheros/cross)
 

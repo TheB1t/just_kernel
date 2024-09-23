@@ -96,10 +96,3 @@ got_lock:
 timed_out:
     xor eax, eax
     ret
-
-[GLOBAL in_irq]
-type in_irq function
-in_irq:
-    xor eax, eax
-    mov al, byte [gs:4]
-    ret

@@ -4,6 +4,7 @@
 #include <drivers/early_screen.h>
 #include <drivers/serial.h>
 #include <drivers/pit.h>
+#include <drivers/vesa.h>
 
 #include <int/gdt.h>
 #include <int/idt.h>
@@ -16,6 +17,7 @@
 
 #include <proc/syscalls.h>
 #include <proc/sched.h>
+#include <proc/v86.h>
 
 #include <io/cpuid.h>
 
@@ -37,7 +39,7 @@ multiboot_info_t mboot_s = {0};
 
 void test_handler() {
     core_locals_t* locals = get_core_locals();
-    ser_printf("Hello from syscall! (core %u, %s, tid %u, in_irq %u, cs 0x%02x)\n", locals->core_id, locals->current_thread->parent->name, locals->current_thread->tid, locals->in_irq, locals->irq_regs->cs);
+    ser_printf("Hello from syscall! (core %u, %s, tid %u, in_irq %u, cs 0x%02x)\n", locals->core_id, locals->current_thread->parent->name, locals->current_thread->tid, locals->in_irq, locals->irq_regs->base.cs);
 }
 
 void test_thread() {
@@ -48,18 +50,27 @@ void test_thread() {
 
 void kernel_thread() {
     // pmm_print_memory_stats();
+    vesa_init();
+    vesa_switch_to_best_mode();
+
+    kprintf("Screen resolution: %dx%d (bpp %d)\n", current_mode->width, current_mode->height, current_mode->bpp);
+
+    // for (uint32_t i = 0; i < 100; i++)
+    //     kprintf("Hello from kernel! %u\n", i);
+
+    interrupt_state_t state = interrupt_lock();
 
     process_t* proc = proc_create_kernel("test0", 0);
-    thread_create(proc, test_thread);
-    thread_create(proc, test_thread);
-    thread_create(proc, test_thread);
+    for (uint32_t i = 0; i < 4; i++)
+        thread_create(proc, test_thread);
     sched_run_proc(proc);
 
     proc = proc_create_kernel("test1", 3);
-    thread_create(proc, test_thread);
-    thread_create(proc, test_thread);
-    thread_create(proc, test_thread);
+    for (uint32_t i = 0; i < 4; i++)
+        thread_create(proc, test_thread);
     sched_run_proc(proc);
+
+    interrupt_unlock(state);
 
     // -- -- -- -- -- -- TEST STUFF -- -- -- -- -- --
     core_locals_t* locals = get_core_locals();
@@ -93,20 +104,26 @@ void kernel_thread() {
     UNREACHEBLE;
 }
 
-void kmain(multiboot_info_t* mboot) {
-    memcpy((uint8_t*)mboot, (uint8_t*)&mboot_s, sizeof(multiboot_info_t));
-
+void kmain(multiboot_info_t* mboot, uint32_t magic) {
     gdt_init();
     init_core_locals_bsp();
 
-    screen_init();
     serial_init(COM1, UART_BAUD_115200);
+
+    if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
+        kprintf("Invalid magic number: %x\n", magic);
+        UNREACHEBLE;
+    }
+
+    memcpy((uint8_t*)mboot, (uint8_t*)&mboot_s, sizeof(multiboot_info_t));
 
     idt_init();
     tss_init();
 
     acpi_init();
     mm_memory_setup(&mboot_s);
+    vesa_init_early(&mboot_s);
+    screen_init();
 
     pic_remap(32, 40);
     apic_configure();
@@ -136,6 +153,8 @@ void kmain(multiboot_info_t* mboot) {
     kprintf("Booted %u cores\n", booted);
 
     sched_init_core();
+
+    v86_init();
     sched_run();
     UNREACHEBLE;
 }

@@ -41,18 +41,18 @@ void panic(char *msg) {
         unlock(kprintf_lock);
         unlock(sprintf_lock);
 
-        kprintf("Kernel PANIC!!! [%s]\n", msg);
+        ser_printf("Kernel PANIC!!! [%s]\n", msg);
 
         core_locals_t* locals = get_core_locals();
         if (locals && locals->in_irq) {
             core_regs_t* regs = locals->irq_regs;
 
-            ser_printf("EAX: 0x%08x, EBX: 0x%08x, ECX 0x%08x\n", regs->eax, regs->ebx, regs->ecx);
-            ser_printf("EDX: 0x%08x, ESI: 0x%08x, EDI 0x%08x\n", regs->edx, regs->esi, regs->edi);
-            ser_printf("EBP: 0x%08x, ESP: 0x%08x, EIP 0x%08x\n", regs->ebp, regs->esp, regs->eip);
-            ser_printf("EFLAGS: 0x%08x\n", regs->eflags);
-            ser_printf("CS: 0x%04x, DS: 0x%04x\n", regs->cs, regs->ds);
-            ser_printf("User SS: 0x%04x, User ESP: 0x%08x\n", regs->user_ss, regs->user_esp);
+            ser_printf("EAX: 0x%08x, EBX: 0x%08x, ECX 0x%08x\n", regs->base.eax, regs->base.ebx, regs->base.ecx);
+            ser_printf("EDX: 0x%08x, ESI: 0x%08x, EDI 0x%08x\n", regs->base.edx, regs->base.esi, regs->base.edi);
+            ser_printf("EBP: 0x%08x, ESP: 0x%08x, EIP 0x%08x\n", regs->base.ebp, regs->base.esp, regs->base.eip);
+            ser_printf("EFLAGS: 0x%08x\n", regs->base.eflags);
+            ser_printf("CS: 0x%04x, DS: 0x%04x\n", regs->base.cs, regs->base.ds);
+            ser_printf("User SS: 0x%04x, User ESP: 0x%08x\n", regs->user.ss, regs->user.esp);
         } else {
             ser_printf("Can't get panic context\n");
         }

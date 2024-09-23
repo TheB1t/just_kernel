@@ -80,7 +80,7 @@ void update_sleeping_threads(core_locals_t* locals) {
         thread_t* thread = entry_thread(iter);
 
         if (thread->state == THREAD_SLEEPING) {
-            thread->sleep_time -= PIT_SPEED_US > thread->sleep_time ? thread->sleep_time : PIT_SPEED_US;
+            thread->sleep_time -= PIT_SPEED_US * 8 > thread->sleep_time ? thread->sleep_time : PIT_SPEED_US * 8;
 
             if (!thread->sleep_time)
                 thread->state = THREAD_STOPPED;
@@ -123,6 +123,8 @@ void save_thread(core_locals_t* locals, thread_t* thread, thread_state_t state) 
     thread->state = state;
     thread->regs = locals->irq_regs;
     // asm volatile("fxsave %0;" : : "m" (*thread->sse_region));
+
+    // ser_printf("[%u][%s:%u] Saved\n", locals->core_id, thread->parent->name, thread->tid);
 }
 
 void load_thread(core_locals_t* locals, thread_t* thread) {
@@ -145,26 +147,25 @@ void enter_idle(core_locals_t* locals) {
     assert(locals->current_thread == NULL);
 
     locals->state = CORE_IDLE;
-    locals->current_thread = NULL;
     locals->irq_regs = locals->idle_thread->regs;
     set_kernel_stack(locals->idle_thread->kernel_stack);
 
-    // ser_printf("[%u] Idle\n", locals->core_id);
+    // kprintf("[%u] Idle\n", locals->core_id);
 }
 
 void _sched(core_locals_t* locals) {
-    if (locals->state == CORE_OFFLINE)
-        return;
+    // if (locals->core_id == 0) {
+    //     ser_printf("Thread list:\n");
+    //     if (have_thread()) {
+    //         struct list_head* iter;
+    //         for_each_thread(iter, thread_list) {
+    //             thread_t* thread = entry_thread(iter);
 
-    // ser_printf("[%u] Thread list (c 0x%08x):\n", locals->core_id, thread);
-    // if (have_thread()) {
-    //     for_each_thread(iter, thread_list) {
-    //         thread_t* thread = entry_thread(iter);
-
-    //         ser_printf("[%u] 0x%08x: %s:%u:%u\n", locals->core_id, thread, thread->parent->name, thread->tid, thread->state);
+    //             ser_printf("   - 0x%08x: %s:%u:%u\n", thread, thread->parent->name, thread->tid, thread->state);
+    //         }
+    //     } else {
+    //         ser_printf("   - Empty\n", locals->core_id);
     //     }
-    // } else {
-    //     ser_printf("[%u] Empty\n", locals->core_id);
     // }
 
     update_sleeping_threads(locals);
@@ -174,36 +175,13 @@ void _sched(core_locals_t* locals) {
     switch (locals->state) {
         case CORE_ONLINE: {
             assert(locals->current_thread != NULL);
+            assert(locals->current_thread->state == THREAD_RUNNING);
 
-            switch (locals->current_thread->state) {
-                case THREAD_RUNNING: {
-                    if (!new_thread)
-                        return;
+            if (!new_thread)
+                return;
 
-                    save_thread(locals, locals->current_thread, THREAD_STOPPED);
-                    load_thread(locals, new_thread);
-                } break;
-
-                case THREAD_TERMINATED: {
-                    ser_printf("[%u][%s:%u] Terminated with exitcode 0x%08x\n", locals->core_id, locals->current_thread->parent->name, locals->current_thread->tid, locals->current_thread->exitcode);
-
-                    locals->current_thread = NULL;
-                    if (!new_thread)
-                        enter_idle(locals);
-                    else
-                        load_thread(locals, new_thread);
-                } break;
-
-                case THREAD_SLEEPING: {
-                    save_thread(locals, locals->current_thread, THREAD_SLEEPING);
-                    locals->current_thread = NULL;
-
-                    if (!new_thread)
-                        enter_idle(locals);
-                    else
-                        load_thread(locals, new_thread);
-                } break;
-            }
+            save_thread(locals, locals->current_thread, THREAD_STOPPED);
+            load_thread(locals, new_thread);
         } break;
 
         case CORE_IDLE:{
@@ -219,6 +197,10 @@ void _sched(core_locals_t* locals) {
             assert(locals->current_thread == NULL);
 
             enter_idle(locals);
+        } break;
+
+        case CORE_OFFLINE: {
+
         } break;
 
         default: {
@@ -295,20 +277,28 @@ void sched_init_core() {
 void sched_thread_exit(uint32_t code) {
     core_locals_t* locals = get_core_locals();
 
-    if (locals->current_thread) {
+    if (locals->current_thread && locals->in_irq) {
+        ser_printf("[%u][%s:%u] Terminated with exitcode 0x%08x\n", locals->core_id, locals->current_thread->parent->name, locals->current_thread->tid, code);
+
+        save_thread(locals, locals->current_thread, THREAD_TERMINATED);
+
         locals->current_thread->exitcode = code;
-        locals->current_thread->state = THREAD_TERMINATED;
-        _sched(locals);
+        locals->current_thread = NULL;
+        enter_idle(locals);
     }
 }
 
 void sched_thread_sleep(uint32_t time_ms) {
     core_locals_t* locals = get_core_locals();
 
-    if (locals->current_thread) {
+    if (locals->current_thread && locals->in_irq) {
+        ser_printf("[%u][%s:%u] Sleeping for %u ms\n", locals->core_id, locals->current_thread->parent->name, locals->current_thread->tid, time_ms);
+
+        save_thread(locals, locals->current_thread, THREAD_SLEEPING);
+
         locals->current_thread->sleep_time = time_ms * 1000;
-        locals->current_thread->state = THREAD_SLEEPING;
-        _sched(locals);
+        locals->current_thread = NULL;
+        enter_idle(locals);
     }
 }
 

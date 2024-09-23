@@ -77,15 +77,15 @@ void stack_trace(uint32_t maxFrames) {
 
 	if (locals->in_irq) {
 		if (stk)
-			for(; maxFrames > 0 && (uint32_t)stk != locals->irq_regs->ebp; maxFrames--) {
+			for(; maxFrames > 0 && (uint32_t)stk != locals->irq_regs->base.ebp; maxFrames--) {
 				if (!stk) break;
 				print_stack_frame(locals, stk->eip, false);
 				stk = stk->ebp;
 			}
 
-		stk = (stackFrame_t*)locals->irq_regs->ebp;
+		stk = (stackFrame_t*)locals->irq_regs->base.ebp;
 
-		print_stack_frame(locals, locals->irq_regs->eip, true);
+		print_stack_frame(locals, locals->irq_regs->base.eip, true);
 		maxFrames--;
 	}
 

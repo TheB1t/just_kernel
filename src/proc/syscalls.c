@@ -12,7 +12,7 @@ void syscalls_set(uint32_t num, void* call) {
 }
 
 void syscalls_handler(core_locals_t* locals) {
-	void* location = syscalls[locals->irq_regs->eax];
+	void* location = syscalls[locals->irq_regs->base.eax];
 
 	if (!location)
 		return;
@@ -29,12 +29,12 @@ void syscalls_handler(core_locals_t* locals) {
 		pop %%ebx;		\
 		pop %%ebx;		\
 		pop %%ebx;		"
-		:	"=a" (locals->irq_regs->eax)
-		:	"r" (locals->irq_regs->edi),
-			"r" (locals->irq_regs->esi),
-			"r" (locals->irq_regs->edx),
-			"r" (locals->irq_regs->ecx),
-			"r" (locals->irq_regs->ebx),
+		:	"=a" (locals->irq_regs->base.eax)
+		:	"r" (locals->irq_regs->base.edi),
+			"r" (locals->irq_regs->base.esi),
+			"r" (locals->irq_regs->base.edx),
+			"r" (locals->irq_regs->base.ecx),
+			"r" (locals->irq_regs->base.ebx),
 			"r" (location)
 	);
 }

@@ -156,7 +156,7 @@ function main() {
         run bochs
         ;;
     "run")
-        run_qemu -machine q35 --cpu core2duo -smp 4 -d int
+        run_qemu -machine q35 --cpu max -smp 4
         ;;
     "runk")
         run_qemu -machine q35 --enable-kvm --cpu host -smp 4

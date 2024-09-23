@@ -19,13 +19,14 @@ extern char smp_trampoline_end[];
 extern char smp_loaded[];
 
 core_locals_t bsp_core_locals = { 0 };
-sse_region_t sse_region = { 0 };
+// sse_region_t sse_region = { 0 };
 
 void init_core_locals_bsp() {
     bsp_core_locals.idt_entries_ptr.base  = (uint32_t)bsp_core_locals.idt_entries;
     bsp_core_locals.idt_entries_ptr.limit = sizeof(idt_entry_t) * IDT_ENTRIES - 1;
 
-    write_msr(0xC0000101, (uint32_t)&bsp_core_locals);
+    // write_msr(0xC0000101, (uint32_t)&bsp_core_locals);
+    write_msr(0xC0000102, (uint32_t)&bsp_core_locals);
 }
 
 void init_core_locals() {
@@ -40,11 +41,12 @@ void init_core_locals() {
     locals->idt_entries_ptr.base  = (uint32_t)phys_locals->idt_entries;
     locals->idt_entries_ptr.limit = sizeof(idt_entry_t) * IDT_ENTRIES - 1;
 
-    write_msr(0xC0000101, (uint32_t)locals);
+    // write_msr(0xC0000101, (uint32_t)locals);
+    write_msr(0xC0000102, (uint32_t)locals);
 }
 
 core_locals_t* get_core_locals() {
-    return (core_locals_t*)(uint32_t)read_msr(0xC0000101);
+    return (core_locals_t*)(uint32_t)read_msr(0xC0000102);
 }
 
 uint8_t smp_get_lapic_id() {
@@ -97,25 +99,25 @@ uint8_t smp_launch_cpus() {
 
                 smp_info_ptr->status    = 0;
                 smp_info_ptr->cr3       = (uint32_t)vmm_get_cr3();
-                smp_info_ptr->esp       = (uint32_t)0x2000 + PAGE_SIZE;
+                smp_info_ptr->esp       = (uint32_t)0xA000;
                 smp_info_ptr->entry     = (uint32_t)smp_loaded;
                 smp_info_ptr->gdt_ptr   = 0x600;
 
                 for (uint32_t try = 0; try < 2; try++) {
                     smp_send_ipi(cpu->apic_id, 0x500);
-                    sleep_no_task(10);
+                    sleep_no_task(100);
                     smp_send_ipi(cpu->apic_id, 0x600 | 0x1);
-                    sleep_no_task(try == 0 ? 10 : 1000);
+                    sleep_no_task(try == 0 ? 100 : 1000);
 
                     if (smp_info_ptr->status > 0) {
                         if (smp_info_ptr->status == 1) {
                             ser_printf("[SMP] Core %u stuck on boot! Waiting...\n", id);
-                            sleep_no_task(10);
+                            sleep_no_task(100);
                         }
 
                         if (smp_info_ptr->status == 2) {
                             ser_printf("[SMP] Core %u on configuration step! Waiting...\n", id);
-                            sleep_no_task(10);
+                            sleep_no_task(100);
                         }
 
                         if (smp_info_ptr->status == 3) {

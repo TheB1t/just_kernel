@@ -8,16 +8,12 @@ extern void gdt_set_gate_type(int32_t num, uint8_t type);
 
 void tss_init() {
 	core_locals_t* locals = get_core_locals();
-	tss_entry_t* tss_entry = &locals->tss_entry;
 
-	tss_entry->ss0	= DESC_SEG(DESC_KERNEL_DATA, PL_RING0);
-	tss_entry->esp0	= 0x0BAD0BAD;
+	locals->tss_entry.iomap_base	= sizeof(tss_entry_t);
+	locals->tss_entry.ss0			= DESC_SEG(DESC_KERNEL_DATA, PL_RING0);
+	locals->tss_entry.esp0			= 0x0BAD0BAD;
 
-	/*
-		I think this is bad practice to use same TSS for each core.
-		Needs to be reworked in the future.
-	*/
-	gdt_set_gate_base(DESC_TSS, (uint32_t)tss_entry);
+	gdt_set_gate_base(DESC_TSS, (uint32_t)&locals->tss_entry);
 	gdt_set_gate_type(DESC_TSS, 0x9);
 	tss_flush(DESC_SEG(DESC_TSS, PL_RING0));
 }

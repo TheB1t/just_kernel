@@ -49,6 +49,11 @@ typedef struct thread {
     uint32_t    user_stack;
     uint32_t    kernel_stack;
 
+    struct {
+        uint32_t    v86_if : 1;
+        uint32_t    res    : 31;
+    } flags;
+
     uint32_t    sleep_time;
     uint32_t    exitcode;
     uint32_t    priority;
@@ -60,7 +65,7 @@ typedef struct thread {
     struct list_head pt_list;
     struct list_head gt_list;
 
-    sse_region_t* sse_region;
+    // sse_region_t* sse_region;
 } thread_t;
 
 thread_t* thread_create(process_t* proc, void* entry);

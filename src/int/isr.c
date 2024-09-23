@@ -71,14 +71,21 @@ char* get_interrupt_name(uint32_t i) {
 
 extern void _sched_runner(core_locals_t* locals);
 
-void isr_handler() {
+void isr_handler(core_regs_t* _regs) {
+	core_regs_base_t* regs = (core_regs_base_t*)_regs;
+
 	core_locals_t* locals = get_core_locals();
 	if (!locals)
 		panic("isr_handler called with no core_locals!");
-	core_regs_t* regs = locals->irq_regs;
 
-	if (locals->nested_irq)
-		ser_printf("Nested IRQ on core %u\n", locals->core_id);
+	if (locals->in_irq) {
+		locals->nested_irq = true;
+		// TODO: Proper handling of nested IRQs
+		ser_printf("Nested IRQ %d (prev IRQ %d) on core %u\n", regs->int_num, locals->irq_regs->base.int_num, locals->core_id);
+	} else {
+		locals->in_irq = true;
+		locals->irq_regs = _regs;
+	}
 
 	// if (regs->int_num != 32 && regs->int_num != 240) {
 	// 	ser_printf("Interrupt %d [%s] on core %u (in_irq %u) ", regs->int_num, get_interrupt_name(regs->int_num), locals->core_id, locals->in_irq);
@@ -88,28 +95,43 @@ void isr_handler() {
 	// 		ser_printf("idle\n");
 	// }
 
-	if (regs->int_num == 0x0D) {
-		ser_printf("General Protection Fault on core %u: %08x\n", locals->core_id, regs->int_err);
-		ser_printf("Type: %s\n", regs->gpf_err.external ? "External" : "Internal");
+	if ((regs->int_num == 0x0D && !regs->v86_mode) || regs->int_num == 0x06) {
+		ser_printf("%s on core %u: %08x\n", get_interrupt_name(regs->int_num), locals->core_id, regs->int_err);
+		ser_printf("Type: %s\n", regs->err.external ? "External" : "Internal");
 		ser_printf("Table: ");
-		switch (regs->gpf_err.table_indicator) {
+		switch (regs->err.table_indicator) {
 			case 0b00: ser_printf("GDT\n"); break;
 			case 0b01: ser_printf("LDT\n"); break;
 			case 0b10: ser_printf("IDT\n"); break;
 			case 0b11: ser_printf("Unknown\n"); break;
 		}
-		ser_printf("Selector: 0x%08x\n", regs->gpf_err.selector);
-		panic("General Protection Fault");
+		ser_printf("Selector: 0x%08x\n", regs->err.selector);
+
+		ser_printf("Code: ");
+		for (uint32_t p = regs->eip - 8; p < regs->eip + 8; p++)
+			ser_printf("%02x ", *(uint8_t*)p);
+		ser_printf("\n");
+
+		panic(get_interrupt_name(regs->int_num));
 	}
 
 	int_handler_t handler = handlers[regs->int_num];
 	if (handler)
 		handler(locals);
-	else
+	else if (regs->int_num < 32) {
 		ser_printf("Unhandled interrupt 0x%02x [%s]\n", regs->int_num, get_interrupt_name(regs->int_num));
+		panic(get_interrupt_name(regs->int_num));
+	}
 
 	if (locals->need_resched)
 		_sched_runner(locals);
+
+	if (locals->nested_irq) {
+		locals->nested_irq = false;
+	} else {
+		_regs = locals->irq_regs;
+		locals->in_irq = false;
+	}
 
 	pic_sendEOI(regs->int_num);
 	apic_EOI();

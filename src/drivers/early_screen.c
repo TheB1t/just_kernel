@@ -1,21 +1,39 @@
 #include <drivers/early_screen.h>
 
-static screen_char* framebuffer = (screen_char*)0xB8000;
+vesa_vector2_t	cursor = { .x = 0, .y = 0 };
 
-screen_cursor   cursor          = { .x = 0, .y = 0 };
-screen_color    current_color   = { .foreground = 15, .background = 0 };
-screen_char     blank	        = { .c = 0x20, .color = { .foreground = 15, .background = 0 } };
+vesa_color_t	fg_color_graphic	= VESA_GRAPHICS_COLOR(255, 255, 255, 0);
+vesa_color_t	bg_color_graphic	= VESA_GRAPHICS_COLOR(0, 0, 0, 0);
 
-screen_color screen_getColor() {
-	return current_color;
+vesa_color_t	fg_color_text	= VESA_TEXT_COLOR(TEXT_COLOR_WHITE);
+vesa_color_t	bg_color_text	= VESA_TEXT_COLOR(TEXT_COLOR_BLACK);
+
+static inline vesa_vector2_t get_symbol_size() {
+	if (current_mode->fb_type == VESA_MODE_TEXT)
+		return (vesa_vector2_t){
+			.x = 1,
+			.y = 1
+		};
+
+	return (vesa_vector2_t){
+		.x = font8x8_basic.width + 2,
+		.y = font8x8_basic.height + 2
+	};
 }
 
-void screen_setColor(screen_color color) {
-	current_color = color;
+static inline vesa_color_t get_color(bool fg) {
+	if (current_mode->fb_type == VESA_MODE_TEXT)
+		return fg ? fg_color_text : bg_color_text;
+
+	return fg ? fg_color_graphic : bg_color_graphic;
 }
 
-void screen_moveCursor() {
-	uint16_t cursor_location = (cursor.y * SCREEN_WIDTH) + cursor.x;
+void screen_move_cursor() {
+	if (current_mode->fb_type != VESA_MODE_TEXT)
+		return;
+
+	uint16_t cursor_location = (cursor.y * current_mode->width) + cursor.x;
+
 	port_outb(0x3D4, 14);
 	port_outb(0x3D5, cursor_location >> 8);
 	port_outb(0x3D4, 15);
@@ -23,25 +41,23 @@ void screen_moveCursor() {
 }
 
 void screen_scroll() {
-	if (cursor.y >= SCREEN_HEIGHT) {
-		for (uint32_t i = 0 * SCREEN_WIDTH; i < (SCREEN_HEIGHT - 1) * SCREEN_WIDTH; i++) {
-			framebuffer[i] = framebuffer[i + SCREEN_WIDTH];
-		}
+	vesa_vector2_t size = get_symbol_size();
 
-		for (uint32_t i = (SCREEN_HEIGHT - 1) * SCREEN_WIDTH; i < SCREEN_HEIGHT * SCREEN_WIDTH; i++) {
-			framebuffer[i] = blank;
-		}
+	if (cursor.y >= current_mode->height - size.y) {
+		vesa_scroll(size.y, get_color(false));
 
-		cursor.y = SCREEN_HEIGHT - 1;
+		cursor.y -= size.y;
 	}
 }
 
-void screen_putChar(char c) {
+void screen_putc(char c) {
+	vesa_vector2_t size = get_symbol_size();
+
 	switch (c) {
 		case '\b':
 			if (cursor.x) {
-				cursor.x--;
-				framebuffer[(cursor.y * SCREEN_WIDTH) + cursor.x] = blank;
+				cursor.x -= size.x;
+				vesa_putc(cursor, ' ', &font8x8_basic, get_color(false), get_color(true));
 			}
 			break;
 
@@ -50,7 +66,9 @@ void screen_putChar(char c) {
 			break;
 
 		case '\n':
-			cursor.y++;
+			cursor.y += size.y;
+			cursor.x = 0;
+			break;
 
 		case '\r':
 			cursor.x = 0;
@@ -58,39 +76,33 @@ void screen_putChar(char c) {
 
 		default:
 			if (c >= ' ') {
-				screen_char* sc = &framebuffer[(cursor.y * SCREEN_WIDTH) + cursor.x];
-				sc->color = current_color;
-				sc->c = c;
-				cursor.x++;
+				vesa_putc(cursor, c, &font8x8_basic, get_color(false), get_color(true));
+				cursor.x += size.x;
 			}
 	}
 
-	if (cursor.x >= 80) {
+	if (cursor.x >= current_mode->width) {
 		cursor.x = 0;
-		cursor.y++;
+		cursor.y += size.y;
 	}
 
 	screen_scroll();
-	screen_moveCursor();
+	screen_move_cursor();
 }
 
 void screen_clear() {
-	for (uint32_t i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
-		framebuffer[i] = blank;
-	}
-
 	cursor.x = 0;
 	cursor.y = 0;
-	screen_moveCursor();
+	screen_move_cursor();
 }
 
-void screen_putString(char* c) {
+void screen_puts(char* c) {
 	while (*c) {
-		screen_putChar(*c++);
+		screen_putc(*c++);
 	}
 }
 
 void screen_init() {
-    _global_putchar = screen_putChar;
+    _global_putchar = screen_putc;
 	screen_clear();
 }
