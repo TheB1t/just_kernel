@@ -2,6 +2,7 @@
 #include <mm/vmm.h>
 #include <mm/pmm.h>
 #include <int/isr.h>
+#include <proc/sched.h>
 
 v86_call_list_t     v86_call_list;
 process_t*          v86_proc    = 0;
@@ -23,10 +24,6 @@ extern void _exit_v86();
 #define FP_SEG(fp)                      (_UINT32(fp) >> 16)
 #define FP_OFF(fp)                      (_UINT32(fp) & 0xffff)
 #define FP_TO_LINEAR(seg, off)          ((void*)((_UINT16(seg) << 4) + _UINT16(off)))
-
-#define SET_BIT(val, bit)               ((val) |= (1 << (bit)))
-#define CLEAR_BIT(val, bit)             ((val) &= ~(1 << (bit)))
-#define TEST_BIT(val, bit)              ((val) & (1 << (bit)))
 
 #define _REL_SYM_ADDR(base, new, sym)   ((_UINT32(sym) - _UINT32(base)) + _UINT32(new))
 #define REL_SYM_ADDR(sym)               _REL_SYM_ADDR(v86_code_start, v86_ptr, sym)
@@ -60,7 +57,7 @@ void v86_enter() {
 
         V86_LOG("running v86 call 0x%08x\n", call);
 
-        call->ctx.sp = (uint16_t)(v86_stack);
+        call->ctx.sp = (uint16_t)((uint32_t)v86_stack);
 
         switch (call->type) {
             case V86_CALL_TYPE_GENERIC_INT: {
@@ -135,6 +132,8 @@ void v86_monitor(core_locals_t* locals) {
 
     bool is_operand32 = false;
     bool is_address32 = false;
+
+    (void)is_address32;
 
     V86_LOG("v86_monitor: cs:ip = %04x:%04x ss:sp = %04x:%04x: ", regs->base.cs, regs->base.eip, regs->user.ss, regs->user.esp);
 

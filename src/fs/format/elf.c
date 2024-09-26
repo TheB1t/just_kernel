@@ -1,4 +1,4 @@
-#include <fs/elf/elf.h>
+#include <fs/format/elf.h>
 
 inline bool ELF32CheckMagic(ELF32Header_t* hdr) {
 	return (hdr->ident.magic & ELF_MAGIC) == ELF_MAGIC;

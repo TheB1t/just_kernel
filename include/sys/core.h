@@ -4,8 +4,7 @@
 #include <int/idt.h>
 #include <sys/core_regs.h>
 #include <sys/tss.h>
-#include <proc/sched.h>
-#include <fs/elf/elf.h>
+#include <proc/thread.h>
 
 typedef enum {
     CORE_OFFLINE,

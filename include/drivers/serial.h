@@ -43,10 +43,10 @@
 #define COM7 0x5E8
 #define COM8 0x4E8
 
-void		ser_printf(const char* format, ...);
+void		ser_printf(char* format, ...);
 
 int32_t		serial_init(uint16_t port, uint16_t baud);
-char		serial_readChar();
-uint32_t	serial_readString(char* str);
-void		serial_writeChar(char a);
-uint32_t	serial_writeString(char* str);
+char		serial_getc();
+uint32_t	serial_gets(char* str);
+void		serial_putc(char a);
+uint32_t	serial_puts(char* str);

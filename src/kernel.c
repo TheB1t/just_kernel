@@ -5,6 +5,8 @@
 #include <drivers/serial.h>
 #include <drivers/pit.h>
 #include <drivers/vesa.h>
+#include <drivers/char/mem.h>
+#include <drivers/char/tty.h>
 
 #include <int/gdt.h>
 #include <int/idt.h>
@@ -24,6 +26,12 @@
 #include <mm/mm.h>
 #include <mm/pmm.h>
 #include <mm/vmm.h>
+
+#include <fs/vfs.h>
+#include <fs/devfs.h>
+#include <fs/ramdisk/ramdisk.h>
+#include <fs/fs.h>
+#include <fs/format/bmp.h>
 
 #include <multiboot.h>
 
@@ -48,15 +56,82 @@ void test_thread() {
     UNREACHEBLE;
 }
 
+void init() {
+    interrupt_state_t state = interrupt_lock();
+
+    (void)vfs_open("/dev/tty0", O_RDWR, 0);     // stdin
+    (void)vfs_open("/dev/tty0", O_RDWR, 0);     // stdout
+    (void)vfs_open("/dev/tty0", O_RDWR, 0);     // stderr
+
+    char test[] = "Hello from mem reader!\n";
+    char test2[] = "SERIAL CONSOLE BABY\n";
+    uint8_t* buf[100] = { 0 };
+
+    // Open different files
+    int mem = vfs_open("/dev/mem", O_RDWR, 0);
+    int pfd = vfs_open("/picture.bmp", O_RDONLY, 0);
+
+    ser_printf("mem: %d, pfd: %d\n", mem, pfd);
+
+    // Memory reading test
+    vfs_lseek(mem, (uint32_t)&test, 0);
+    vfs_read(mem, (char*)buf, strlen(test) + 1);
+
+    ser_printf("readed: %s", (char*)buf);
+
+    // Memory writing test
+    vfs_lseek(mem, (uint32_t)&test, 0);
+    vfs_write(mem, (char*)test2, strlen(test2) + 1);
+
+    // Stdout writing test
+    vfs_write(1, test, strlen(test));
+
+    // Common reading test
+    bmp_draw(0, 200, pfd);
+
+    // for (uint32_t i = 0; i < 100; i++)
+    //     kprintf("Hello from kernel! %u\n", i);
+
+    // Cleanup
+    vfs_close(mem);
+    vfs_close(pfd);
+
+    interrupt_unlock(state);
+}
+
 void kernel_thread() {
-    // pmm_print_memory_stats();
+
+    mem_init();
+    tty_init();
+    ramdisk_init();
+
+	if (mboot_s.mods_count > 0) {
+        multiboot_module_t* modules = (multiboot_module_t*)mboot_s.mods_addr;
+
+        void* modules_block = (void*)modules[0].mod_start;
+        uint32_t modules_block_size = modules[mboot_s.mods_count - 1].mod_end - modules[0].mod_start;
+
+        vmm_map(modules_block, modules_block, modules_block_size / PAGE_SIZE, VMM_PRESENT | VMM_WRITE | VMM_USER);
+
+		for (uint32_t i = 0; i < mboot_s.mods_count; i++) {
+            uint32_t* _m = (void*)modules[i].mod_start;
+            // uint32_t _m_size = modules[i].mod_end - modules[i].mod_start;
+
+            switch (*_m) {
+                case RAMDISK_MAGIC: {
+                    ser_printf("Found ramdisk at 0x%x\n", _m);
+                    mount_root((void*)_m);
+                } break;
+            }
+        }
+	} else {
+        panic("Can't load ramdisk!!!");
+    }
+
     vesa_init();
     vesa_switch_to_best_mode();
 
     kprintf("Screen resolution: %dx%d (bpp %d)\n", current_mode->width, current_mode->height, current_mode->bpp);
-
-    // for (uint32_t i = 0; i < 100; i++)
-    //     kprintf("Hello from kernel! %u\n", i);
 
     interrupt_state_t state = interrupt_lock();
 
@@ -90,15 +165,14 @@ void kernel_thread() {
     cpuid_string(CPUID_INTELBRANDSTRINGEND, str);
     kprintf("%s\n", str);
 
+    // uint32_t* hello_page_fault = (uint32_t*)0xDEADBEEF;
+    // *hello_page_fault = 0xFACEB00C;
+
+    init();
+
     kprintf("Wait 1 second!\n");
     syscall1(1, 1000);
     kprintf("DONE!\n");
-
-    // kprintf("Hello from kmain! Core %u (in_irq %u)\n", locals->apic_id, locals->in_irq);
-    // pmm_print_memory_stats();
-
-    // uint32_t* hello_page_fault = (uint32_t*)0xDEADBEEF;
-    // *hello_page_fault = 0xFACEB00C;
 
     syscall1(0, 0xDEADBEEF);
     UNREACHEBLE;

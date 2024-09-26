@@ -7,7 +7,11 @@ lock_t irq_sprintf_lock	= INIT_LOCK(irq_sprintf_lock);
 
 uint16_t _active_port = 0;
 
-void ser_printf(const char* format, ...) {
+void _ser_printf_putchar(char c, void* arg UNUSED) {
+	serial_putc(c);
+}
+
+void ser_printf(char* format, ...) {
 	if (!_active_port)
 		return;
 
@@ -22,7 +26,7 @@ void ser_printf(const char* format, ...) {
 		lock(irq_sprintf_lock);
 		va_list va;
 		va_start(va, format);
-		_vprintf(serial_writeChar, format, va);
+		_vprintf(_ser_printf_putchar, NULL, format, va);
 		va_end(va);
 		unlock(irq_sprintf_lock);
 		return;
@@ -32,7 +36,7 @@ generic:
 	lock(sprintf_lock);
 	va_list va;
 	va_start(va, format);
-	_vprintf(serial_writeChar, format, va);
+	_vprintf(_ser_printf_putchar, NULL, format, va);
 	va_end(va);
 	unlock(sprintf_lock);
 }
@@ -59,19 +63,19 @@ int32_t serial_recived(uint16_t port) {
 	return port_inb(port + UART_LSR) & 1;
 }
 
-int serial_isTransmitEmpty(uint16_t port) {
+int32_t serial_can_transmit(uint16_t port) {
 	return port_inb(port + UART_LSR) & 0x20;
 }
 
-char serial_readChar() {
+char serial_getc() {
    while (serial_recived(_active_port) == 0);
    return port_inb(_active_port);
 }
 
-uint32_t serial_readString(char* str) {
+uint32_t serial_gets(char* str) {
 	uint32_t readed = 0;
 	while (1) {
-		char c = serial_readChar(_active_port);
+		char c = serial_getc(_active_port);
 		str[readed++] = c;
 		if (c == '\0')
 			break;
@@ -79,19 +83,19 @@ uint32_t serial_readString(char* str) {
 	return readed;
 }
 
-void serial_writeChar(char c) {
-	while (serial_isTransmitEmpty(_active_port) == 0);
+void serial_putc(char c) {
+	while (serial_can_transmit(_active_port) == 0);
 	port_outb(_active_port, c);
 
 	if (c == '\n')
-		serial_writeChar('\r');
+		serial_putc('\r');
 }
 
-uint32_t serial_writeString(char* str) {
+uint32_t serial_puts(char* str) {
 	uint32_t writed = 0;
 	while (1) {
 		char c = str[writed++];
-		serial_writeChar(c);
+		serial_putc(c);
 		if (c == '\0')
 			break;
 	}

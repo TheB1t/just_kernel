@@ -19,9 +19,9 @@ uint32_t _cpuid_string(CPUID_Request_t request, uint32_t* ebx, uint32_t* ecx, ui
 void _to_string(uint32_t part0, uint32_t part1, uint32_t part2, uint32_t part3, CPUID_String_t str) {
     uint32_t parts[4] = { part0, part1, part2, part3 };
 
-    int offset = 0;
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) {
+    int32_t offset = 0;
+    for (int32_t i = 0; i < 4; ++i) {
+        for (int32_t j = 0; j < 4; ++j) {
             str[offset++] = (char)((parts[i] >> (j * 8)) & 0xFF);
         }
     }

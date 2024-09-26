@@ -143,7 +143,7 @@ static inline void list_move_tail(struct list_head *list,
 * list_empty - tests whether a list is empty
 * @head: the list to test.
 */
-static inline int list_empty(struct list_head *head)
+static inline int32_t list_empty(struct list_head *head)
 {
     return head->next == head || head->next == (void*)0;
 }
@@ -152,9 +152,9 @@ static inline int list_empty(struct list_head *head)
 * list_size - get the number of entries in list
 * @head: the list to get the size of
 */
-static inline int list_size(struct list_head *head)
+static inline int32_t list_size(struct list_head *head)
 {
-    int size = 0;
+    int32_t size = 0;
     struct list_head *p = head->next;
 
     while (p != head) {

@@ -2,11 +2,9 @@
 
 vesa_vector2_t	cursor = { .x = 0, .y = 0 };
 
-vesa_color_t	fg_color_graphic	= VESA_GRAPHICS_COLOR(255, 255, 255, 0);
-vesa_color_t	bg_color_graphic	= VESA_GRAPHICS_COLOR(0, 0, 0, 0);
-
-vesa_color_t	fg_color_text	= VESA_TEXT_COLOR(TEXT_COLOR_WHITE);
-vesa_color_t	bg_color_text	= VESA_TEXT_COLOR(TEXT_COLOR_BLACK);
+vesa_color_t	graphics_text_color	= VESA_GRAPHICS_RGB888(255, 255, 255);
+vesa_color_t	graphics_bg_color	= VESA_GRAPHICS_RGB888(0, 0, 0);
+vesa_color_t	color_text			= VESA_TEXT_ATTRIBUTE(TEXT_COLOR_BLACK, TEXT_COLOR_WHITE);
 
 static inline vesa_vector2_t get_symbol_size() {
 	if (current_mode->fb_type == VESA_MODE_TEXT)
@@ -16,16 +14,16 @@ static inline vesa_vector2_t get_symbol_size() {
 		};
 
 	return (vesa_vector2_t){
-		.x = font8x8_basic.width + 2,
+		.x = font8x8_basic.width,
 		.y = font8x8_basic.height + 2
 	};
 }
 
-static inline vesa_color_t get_color(bool fg) {
+static inline void _putc(char c) {
 	if (current_mode->fb_type == VESA_MODE_TEXT)
-		return fg ? fg_color_text : bg_color_text;
-
-	return fg ? fg_color_graphic : bg_color_graphic;
+		vesa_put_symbol(cursor, c, color_text);
+	else
+		vesa_render_symbol(cursor, c, &font8x8_basic, graphics_text_color);
 }
 
 void screen_move_cursor() {
@@ -44,7 +42,10 @@ void screen_scroll() {
 	vesa_vector2_t size = get_symbol_size();
 
 	if (cursor.y >= current_mode->height - size.y) {
-		vesa_scroll(size.y, get_color(false));
+		if (current_mode->fb_type == VESA_MODE_TEXT)
+			vesa_scroll(size.y, color_text);
+		else
+			vesa_scroll(size.y, graphics_bg_color);
 
 		cursor.y -= size.y;
 	}
@@ -57,7 +58,7 @@ void screen_putc(char c) {
 		case '\b':
 			if (cursor.x) {
 				cursor.x -= size.x;
-				vesa_putc(cursor, ' ', &font8x8_basic, get_color(false), get_color(true));
+				_putc(c);
 			}
 			break;
 
@@ -76,7 +77,7 @@ void screen_putc(char c) {
 
 		default:
 			if (c >= ' ') {
-				vesa_putc(cursor, c, &font8x8_basic, get_color(false), get_color(true));
+				_putc(c);
 				cursor.x += size.x;
 			}
 	}
@@ -102,7 +103,11 @@ void screen_puts(char* c) {
 	}
 }
 
+void _screen_putchar(char c, void* arg UNUSED) {
+	screen_putc(c);
+}
+
 void screen_init() {
-    _global_putchar = screen_putc;
+    _global_putchar = _screen_putchar;
 	screen_clear();
 }

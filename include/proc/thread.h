@@ -48,7 +48,6 @@ typedef struct thread {
 
     uint32_t    user_stack;
     uint32_t    kernel_stack;
-
     struct {
         uint32_t    v86_if : 1;
         uint32_t    res    : 31;

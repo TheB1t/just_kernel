@@ -3,9 +3,10 @@
 #include <klibc/stdlib.h>
 #include <klibc/stdarg.h>
 
-typedef void (*printf_putchar_t)(char c);
+typedef void (*printf_putchar_t)(char c, void* arg);
 
 extern printf_putchar_t _global_putchar;
 
-void kprintf(const char* format, ...);
-void _vprintf(printf_putchar_t putchar, const char* format, va_list args);
+void sprintf(char* buf, char* format, ...);
+void kprintf(char* format, ...);
+void _vprintf(printf_putchar_t putchar, void* putchar_arg, char* format, va_list args);

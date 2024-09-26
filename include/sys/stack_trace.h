@@ -3,7 +3,7 @@
 #include <klibc/stdlib.h>
 #include <sys/smp.h>
 #include <mm/vmm.h>
-#include <fs/elf/elf.h>
+#include <fs/format/elf.h>
 
 #define KERNEL_TABLE_OBJ	(&kernel_table_obj)
 

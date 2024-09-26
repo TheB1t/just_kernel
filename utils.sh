@@ -104,16 +104,24 @@ function build() {
 
     log BUILD "Type: ${type}"
     run cmake -B build . -DCMAKE_BUILD_TYPE=${type}
-    run make -C build
+    run make -C build -j$(nproc)
 }
 
 function pack() {
     local dst=$1
 
+    pushd ./ramdisk
+    run python3 pack.py
+    # run xxd ramdisk.bin
+    popd
+
     run sudo rm ${dst}/boot/grub/grub.cfg
     run sudo rm ${dst}/kernel
+    run sudo rm ${dst}/ramdisk.bin
+
     run sudo cp ${GRUB_CFG_PATH} ${dst}/boot/grub/
     run sudo cp build/bin/kernel ${dst}/
+    run sudo cp ramdisk/ramdisk.bin ${dst}/
 }
 
 #  Run qemu

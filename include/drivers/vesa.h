@@ -5,6 +5,18 @@
 #include <drivers/font.h>
 
 typedef struct {
+	uint8_t     r_mask;
+	uint8_t     g_mask;
+	uint8_t     b_mask;
+	uint8_t     a_mask;
+
+	uint8_t     r_pos;
+	uint8_t     g_pos;
+	uint8_t     b_pos;
+	uint8_t     a_pos;
+} vesa_color_mode_t;
+
+typedef struct {
     uint32_t    x;
     uint32_t    y;
 } vesa_vector2_t;
@@ -28,17 +40,10 @@ typedef enum {
     TEXT_COLOR_WHITE           = 15,
 } vesa_text_color_t;
 
-typedef struct {
-    uint32_t    raw;
+typedef uint32_t vesa_color_t;
 
-    uint32_t    b : 8;
-    uint32_t    g : 8;
-    uint32_t    r : 8;
-    uint32_t    a : 8;
-} vesa_color_t;
-
-#define VESA_TEXT_COLOR(_color)                 ((vesa_color_t){ .raw = (_color) })
-#define VESA_GRAPHICS_COLOR(_r, _g, _b, _a)     ((vesa_color_t){ .r = (_r), .g = (_g), .b = (_b), .a = (_a)})
+#define VESA_TEXT_ATTRIBUTE(_fg, _bg)           ((vesa_color_t)(_fg) << 4 | (_bg))
+#define VESA_GRAPHICS_RGB888(_r, _g, _b)     	((vesa_color_t)(((_r) & 0xFF) << 16) | (((_g) & 0xFF) << 8) | ((_b) & 0xFF))
 
 typedef enum {
     VESA_MODE_TEXT,
@@ -57,14 +62,7 @@ typedef struct vesa_video_mode {
     uint32_t    pitch;
     uint8_t     bpp;
 
-	uint8_t     r_mask;
-	uint8_t     r_pos;
-	uint8_t     g_mask;
-	uint8_t     g_pos;
-	uint8_t     b_mask;
-	uint8_t     b_pos;
-	uint8_t     a_mask;
-	uint8_t     a_pos;
+	vesa_color_mode_t color_mode;
 
     struct vesa_video_mode* next;
 } vesa_video_mode_t;
@@ -135,6 +133,7 @@ void                    vesa_init();
 vesa_video_mode_t*      vesa_find_mode(uint32_t width, uint32_t height, uint8_t bpp);
 void                    vesa_set_mode(vesa_video_mode_t* mode);
 void					vesa_switch_to_best_mode();
-void                    vesa_putc(vesa_vector2_t pos, char c, font_t* font, vesa_color_t bg, vesa_color_t fg);
+void 					vesa_put_symbol(vesa_vector2_t pos, char c, vesa_color_t color);
+void					vesa_render_symbol(vesa_vector2_t pos, char c, font_t* font, vesa_color_t text_color);
 void                    vesa_scroll(uint32_t rows, vesa_color_t bg);
-void                    vesa_draw_picture(vesa_vector2_t pos, uint32_t width, uint32_t height, uint8_t* data);
+void                    vesa_draw_picture(vesa_vector2_t pos, uint32_t width, uint32_t height, uint8_t bpp, uint8_t* data);

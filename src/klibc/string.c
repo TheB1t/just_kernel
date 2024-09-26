@@ -23,7 +23,7 @@ void strncpy(char *src, char *dst, uint32_t max) {
     *dst = '\0';
 }
 
-int strcmp(char *s1, char *s2) {
+int32_t strcmp(char *s1, char *s2) {
     if (strlen(s1) != strlen(s2)) return 1;
     while (*s1 != '\0' && *s2 != '\0') {
         if (*s1 != *s2) return 1;
@@ -33,11 +33,53 @@ int strcmp(char *s1, char *s2) {
     return 0;
 }
 
-int strncmp(char *s1, char *s2, uint32_t len) {
+int32_t strncmp(char *s1, char *s2, uint32_t len) {
     for (uint32_t i = 0; i < len; i++) {
         if (s1[i] != s2[i]) return 1;
     }
     return 0;
+}
+
+char* strchr(char *str, int32_t c) {
+    while (*str) {
+        if (*str == (char)c)
+            return (char*)str;
+        str++;
+    }
+
+    return (*str == (char)c) ? (char *)str : NULL;
+}
+
+char* strtok(char* str, char* delim) {
+    static char* next_token = NULL;
+
+    if (str != NULL)
+        next_token = str;
+
+    if (next_token == NULL)
+        return NULL;
+
+    char *token_start = next_token;
+    while (*token_start && strchr(delim, *token_start))
+        token_start++;
+
+    if (*token_start == '\0') {
+        next_token = NULL;
+        return NULL;
+    }
+
+    char *token_end = token_start;
+    while (*token_end && !strchr(delim, *token_end))
+        token_end++;
+
+    if (*token_end) {
+        *token_end = '\0';
+        next_token = token_end + 1;
+    } else {
+        next_token = NULL;
+    }
+
+    return token_start;
 }
 
 void reverse(char str[]) {
@@ -68,7 +110,7 @@ void _vtoa(char* result, uint32_t base, int32_t value) {
     }
 
     char *ptr = result, *ptr1 = result, tmp_char;
-    int tmp_value;
+    int32_t tmp_value;
 
     do {
         tmp_value = value;

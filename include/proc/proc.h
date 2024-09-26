@@ -4,7 +4,8 @@
 #include <klibc/llist.h>
 #include <mm/vmm.h>
 #include <mm/heap.h>
-#include <fs/elf/elf.h>
+#include <fs/format/elf.h>
+#include <fs/fs.h>
 
 #define PROC_HEAD(x)   (&(x)->gp_head)
 #define PROC_LIST(x)   (&(x)->gp_list)
@@ -29,12 +30,19 @@ typedef struct process {
     uint8_t         ring;
     Heap_t*         heap;
 
+    int32_t         tty;
+
+    file_t*         files[NR_OPEN];
+
+    inode_t*        pwd;
+    inode_t*        root;
+
     ELF32Obj_t*     elf_obj;
 
     struct list_head gp_list;
     struct list_head pt_head;
 } process_t;
 
-process_t*  proc_create_kernel(const char* name, uint8_t ring);
-process_t*  proc_create_from_elf(const char* name, ELF32Obj_t* hdr, uint8_t ring);
+process_t*  proc_create_kernel(char* name, uint8_t ring);
+process_t*  proc_create_from_elf(char* name, ELF32Obj_t* hdr, uint8_t ring);
 void proc_free(process_t* proc);

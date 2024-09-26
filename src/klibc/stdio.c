@@ -4,16 +4,31 @@
 lock_t kprintf_lock	= INIT_LOCK(kprintf_lock);
 printf_putchar_t _global_putchar = NULL;
 
-void kprintf(const char* format, ...) {
+void _sprintf_putchar(char c, void* arg) {
+    char** buf = (char**)arg;
+
+    **buf = c;
+    (*buf)++;
+	**buf = 0;
+}
+
+void sprintf(char* buf, char* format, ...) {
+	va_list va;
+	va_start(va, format);
+	_vprintf(_sprintf_putchar, (void*)&buf, format, va);
+	va_end(va);
+}
+
+void kprintf(char* format, ...) {
 	lock(kprintf_lock);
     va_list va;
     va_start(va, format);
-    _vprintf(_global_putchar, format, va);
+    _vprintf(_global_putchar, NULL, format, va);
     va_end(va);
 	unlock(kprintf_lock);
 }
 
-void _vprintf(printf_putchar_t putchar, const char* format, va_list args) {
+void _vprintf(printf_putchar_t putchar, void* putchar_arg, char* format, va_list args) {
 	char c, num = 0, sym = ' ';
 	char buf[20];
 	char padRight = 0;
@@ -29,7 +44,7 @@ void _vprintf(printf_putchar_t putchar, const char* format, va_list args) {
 		num = 0;
 
 		if (c != '%')
-			putchar(c);
+			putchar(c, putchar_arg);
 		else {
 			char* p;
 
@@ -39,7 +54,7 @@ void _vprintf(printf_putchar_t putchar, const char* format, va_list args) {
 				case 'd':
 				case 'u':
 				case 'x':
-                    v = va_arg(args, unsigned int);
+                    v = va_arg(args, uint32_t);
 					if (c == 'x')
 						htoa(v, buf);
 					else
@@ -57,21 +72,21 @@ void _vprintf(printf_putchar_t putchar, const char* format, va_list args) {
 						num -= (char)strlen(p) > num ? num : (char)strlen(p);
 						if (!padRight)
 							while (num--)
-								putchar(sym);
+								putchar(sym, putchar_arg);
 					}
 
 					while (*p)
-						putchar(*p++);
+						putchar(*p++, putchar_arg);
 
 					if (num && padRight)
 						while (num--)
-							putchar(sym);
+							putchar(sym, putchar_arg);
 
 					break;
 
 				case 'c':
-                    v = va_arg(args, unsigned int);
-					putchar((char)v);
+                    v = va_arg(args, uint32_t);
+					putchar((char)v, putchar_arg);
                     break;
 
 				default:
@@ -92,8 +107,8 @@ void _vprintf(printf_putchar_t putchar, const char* format, va_list args) {
 						}
 						goto back;
 					} else {
-                        v = va_arg(args, unsigned int);
-                        putchar((char)v);
+                        v = va_arg(args, uint32_t);
+                        putchar((char)v, putchar_arg);
 					}
 					break;
 			}

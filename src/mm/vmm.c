@@ -1,6 +1,7 @@
 #include <mm/vmm.h>
 #include <mm/pmm.h>
 #include <int/isr.h>
+#include <klibc/lock.h>
 #include <sys/stack_trace.h>
 
 #define KERNEL_SPACE            (0x10000000)
@@ -193,8 +194,8 @@ uint8_t range_mapped(void* data, uint32_t size) {
     return 1;
 }
 
-int vmm_map_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t count, uint16_t perms) {
-    int ret = 0;
+int32_t vmm_map_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t count, uint16_t perms) {
+    int32_t ret = 0;
 
     uint32_t cur_virt = ((uint32_t)virt) & VMM_4K_PERM_MASK;
     uint32_t cur_phys = ((uint32_t)phys) & VMM_4K_PERM_MASK;
@@ -227,8 +228,8 @@ int vmm_map_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t count,
     return ret;
 }
 
-int vmm_remap_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t count, uint16_t perms) {
-    int ret = 0;
+int32_t vmm_remap_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t count, uint16_t perms) {
+    int32_t ret = 0;
 
     uint32_t cur_virt = ((uint32_t)virt) & VMM_4K_PERM_MASK;
     uint32_t cur_phys = ((uint32_t)phys) & VMM_4K_PERM_MASK;
@@ -255,8 +256,8 @@ int vmm_remap_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t coun
     return ret;
 }
 
-int vmm_unmap_pages(void* virt, vmm_table_t* page_dir, uint32_t count) {
-    int ret = 0;
+int32_t vmm_unmap_pages(void* virt, vmm_table_t* page_dir, uint32_t count) {
+    int32_t ret = 0;
 
     uint32_t cur_virt = ((uint32_t)virt) & VMM_4K_PERM_MASK;
 
@@ -286,15 +287,15 @@ int vmm_unmap_pages(void* virt, vmm_table_t* page_dir, uint32_t count) {
     return ret;
 }
 
-int vmm_map(void* phys, void* virt, uint32_t count, uint16_t perms) {
+int32_t vmm_map(void* phys, void* virt, uint32_t count, uint16_t perms) {
     return vmm_map_pages(phys, virt, vmm_get_cr3(), count, perms);
 }
 
-int vmm_remap(void* phys, void* virt, uint32_t count, uint16_t perms) {
+int32_t vmm_remap(void* phys, void* virt, uint32_t count, uint16_t perms) {
     return vmm_remap_pages(phys, virt, vmm_get_cr3(), count, perms);
 }
 
-int vmm_unmap(void* virt, uint32_t count) {
+int32_t vmm_unmap(void* virt, uint32_t count) {
     return vmm_unmap_pages(virt, vmm_get_cr3(), count);
 }
 

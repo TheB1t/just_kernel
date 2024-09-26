@@ -1,6 +1,15 @@
 #pragma once
 
-#define BIT(n) (1 << (n))
+#define BIT(n)                          (1 << (n))
+
+#define SET_MASK(val, mask)             ((val) |=   (mask))
+#define CLEAR_MASK(val, mask)           ((val) &=  ~(mask))
+#define APPLY_MASK(val, mask)           ((val) &    (mask))
+#define TEST_MASK(val, mask)            (APPLY_MASK(val, mask) == (mask))
+
+#define SET_BIT(val, bit)               SET_MASK(val, BIT(bit))
+#define CLEAR_BIT(val, bit)             CLEAR_MASK(val, BIT(bit))
+#define TEST_BIT(val, bit)              TEST_MASK(val, BIT(bit))
 
 #define NULL (void*)0
 

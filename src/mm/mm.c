@@ -35,6 +35,18 @@ void mm_memory_setup(multiboot_info_t* mboot) {
         panic("Can't init memory manager");
     }
 
+    if (mboot->mods_count > 0) {
+        multiboot_module_t* modules = (multiboot_module_t*)mboot->mods_addr;
+
+        void* modules_block = (void*)modules[0].mod_start;
+        uint32_t modules_block_size = modules[mboot->mods_count - 1].mod_end - modules[0].mod_start;
+
+        if (!pmm_alloc_from((void*)modules_block, modules_block_size)) {
+            ser_printf("[MM] Failed to allocate modules address space!");
+            panic("Can't init memory manager");
+        }
+    }
+
     pmm_print_memory_stats();
 
     vmm_memory_setup(mmap, mmap_len);

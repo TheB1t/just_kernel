@@ -55,13 +55,13 @@ void* virt_to_phys(void* virt, vmm_table_t* table0);
 uint8_t is_mapped(void* data, vmm_table_t* cr3);
 uint8_t range_mapped(void* data, uint32_t size);
 
-int vmm_map_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t count, uint16_t perms);
-int vmm_remap_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t count, uint16_t perms);
-int vmm_unmap_pages(void* virt, vmm_table_t* page_dir, uint32_t count);
+int32_t vmm_map_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t count, uint16_t perms);
+int32_t vmm_remap_pages(void* phys, void* virt, vmm_table_t* page_dir, uint32_t count, uint16_t perms);
+int32_t vmm_unmap_pages(void* virt, vmm_table_t* page_dir, uint32_t count);
 
-int vmm_map(void* phys, void* virt, uint32_t count, uint16_t perms);
-int vmm_remap(void* phys, void* virt, uint32_t count, uint16_t perms);
-int vmm_unmap(void* virt, uint32_t count);
+int32_t vmm_map(void* phys, void* virt, uint32_t count, uint16_t perms);
+int32_t vmm_remap(void* phys, void* virt, uint32_t count, uint16_t perms);
+int32_t vmm_unmap(void* virt, uint32_t count);
 
 void* vmm_virt_to_phys(void* virt);
 void vmm_memory_setup(multiboot_memory_map_t* mmap, uint32_t mmap_len);

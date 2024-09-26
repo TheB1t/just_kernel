@@ -5,11 +5,13 @@
 
 /* String manipulation functions */
 void        reverse(char s[]);
-void        strcpy(char *src, char *dst);
-void        strncpy(char *src, char *dst, uint32_t max);
-int         strcmp(char *s1, char *s2);
-int         strncmp(char *s1, char *s2, uint32_t len);
+void        strcpy(char* src, char* dst);
+void        strncpy(char* src, char* dst, uint32_t max);
+int32_t     strcmp(char* s1, char* s2);
+int32_t     strncmp(char* s1, char* s2, uint32_t len);
 void        strcat(char *dst, char *src);
+char*       strchr(char* str, int32_t c);
+char*       strtok(char* str, char* delim);
 uint32_t    strlen(char str[]);
 
 /* Integer functions */
@@ -19,7 +21,7 @@ void        itoa(int32_t n, char str[]);
 void        htoa(uint32_t in, char str[]);
 
 /* Memory functions */
-void        memcpy(uint8_t *src, uint8_t *dst, uint32_t count);
-void        memcpy32(uint32_t *src, uint32_t *dst, uint32_t count);
-void        memset(uint8_t *dst, uint8_t data, uint32_t count);
-void        memset32(uint32_t *dst, uint32_t data, uint32_t count);
+void        memcpy(uint8_t* src, uint8_t* dst, uint32_t count);
+void        memcpy32(uint32_t* src, uint32_t* dst, uint32_t count);
+void        memset(uint8_t* dst, uint8_t data, uint32_t count);
+void        memset32(uint32_t* dst, uint32_t data, uint32_t count);

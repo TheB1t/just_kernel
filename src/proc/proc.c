@@ -8,7 +8,7 @@
 extern vmm_table_t* base_kernel_cr3;
 extern Heap_t* kernel_heap;
 
-process_t* proc_alloc(const char* name, uint8_t ring) {
+process_t* proc_alloc(char* name, uint8_t ring) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
 
     if (proc) {
@@ -49,7 +49,7 @@ void proc_free(process_t* proc) {
     }
 }
 
-process_t* proc_create_kernel(const char* name, uint8_t ring) {
+process_t* proc_create_kernel(char* name, uint8_t ring) {
     process_t* proc = proc_alloc(name, ring);
 
     if (proc)
@@ -58,7 +58,7 @@ process_t* proc_create_kernel(const char* name, uint8_t ring) {
     return proc;
 }
 
-process_t* proc_create_from_elf(const char* name, ELF32Obj_t* hdr, uint8_t ring) {
+process_t* proc_create_from_elf(char* name, ELF32Obj_t* hdr, uint8_t ring) {
     process_t* proc = proc_alloc(name, ring);
 
     if (proc) {
