@@ -218,17 +218,21 @@ void vesa_set_mode(vesa_video_mode_t* mode) {
     ser_printf("    - bpp: %u\n", current_mode->bpp);
 }
 
-void vesa_switch_to_best_mode() {
-    vesa_video_mode_t* best = vesa_modes;
-    vesa_video_mode_t* mode = vesa_modes;
-    while (mode) {
+void vesa_switch_to_best_mode(bool force_text) {
+    vesa_video_mode_t* best = NULL;
+
+    for (vesa_video_mode_t* mode = vesa_modes; mode; mode = mode->next) {
+        if (force_text && mode->fb_type == VESA_MODE_GRAPHIC)
+            continue;
+
+        if (!best)
+            best = mode;
+
         if (mode->width > best->width ||
             (mode->width == best->width && mode->height > best->height) ||
             (mode->width == best->width && mode->height == best->height && mode->bpp > best->bpp)) {
             best = mode;
         }
-
-        mode = mode->next;
     }
 
     vesa_set_mode(best);
@@ -246,17 +250,17 @@ void vesa_put_symbol(vesa_vector2_t pos, char c, vesa_color_t color) {
 }
 
 static inline void vesa_color2entry(uint8_t* entry, vesa_color_t color) {
-    if (current_mode->fb_type == VESA_MODE_TEXT) {
-        entry[0] = ' ';
-        entry[1] = color;
-    } else {
-        memcpy((uint8_t*)&color, entry, current_mode->bpp / 8);
-    }
+    if (current_mode->fb_type == VESA_MODE_TEXT)
+        return;
+
+    memcpy((uint8_t*)&color, entry, current_mode->bpp / 8);
 }
 
 void vesa_render_symbol(vesa_vector2_t pos, char c, font_t* font, vesa_color_t text_color) {
     if (current_mode->fb_type != VESA_MODE_GRAPHIC)
         return;
+
+    vesa_color_t color = vesa_color2color(text_color, VESA_BPP2COLOR_MODE(24, 0), &current_mode->color_mode);
 
     for (uint8_t iy = 0; iy < font->height; iy++) {
         for (uint8_t ix = 0; ix < font->width; ix++) {
@@ -268,23 +272,37 @@ void vesa_render_symbol(vesa_vector2_t pos, char c, font_t* font, vesa_color_t t
             uint32_t x = pos.x + ix;
             uint32_t idx = (y * current_mode->pitch) + (x * (current_mode->bpp / 8));
 
-            vesa_color_t color = vesa_color2color(text_color, VESA_BPP2COLOR_MODE(24, 0), &current_mode->color_mode);
             vesa_color2entry(&current_mode->fb[idx], color);
         }
     }
 }
 
 void vesa_scroll(uint32_t rows, vesa_color_t bg) {
+    if (current_mode->fb_type != VESA_MODE_GRAPHIC)
+        return;
+
     uint32_t rows_shift = rows * current_mode->pitch;
     uint32_t delta      = current_mode->fb_size - rows_shift;
+    vesa_color_t color  = vesa_color2color(bg, VESA_BPP2COLOR_MODE(24, 0), &current_mode->color_mode);
 
-    for (uint32_t i = delta; i < current_mode->fb_size; i += current_mode->bpp)
-        vesa_color2entry(&current_mode->fb[i], bg);
+    for (uint32_t i = delta; i < current_mode->fb_size; i += current_mode->bpp) {
+        if (current_mode->fb_type == VESA_MODE_TEXT) {
+            uint8_t* fb_entry = (uint8_t*)&current_mode->fb[i];
+
+            fb_entry[0] = ' ';
+            fb_entry[1] = bg;
+        } else {
+            vesa_color2entry(&current_mode->fb[i], color);
+        }
+    }
 
     memcpy((uint8_t*)(current_mode->fb + rows_shift), (uint8_t*)current_mode->fb, delta);
 }
 
 void vesa_draw_picture(vesa_vector2_t pos, uint32_t width, uint32_t height, uint8_t bpp, uint8_t* data) {
+    if (current_mode->fb_type != VESA_MODE_GRAPHIC)
+        return;
+
     ser_printf("Drawing picture at %d, %d (size %d x %d)\n", pos.x, pos.y, width, height);
 
     uint32_t pitch = width * (bpp / 8);

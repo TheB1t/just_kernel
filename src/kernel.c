@@ -43,6 +43,13 @@
     - initrd support
 */
 
+typedef struct {
+    uint8_t nographic : 1;
+    uint8_t reserved  : 7;
+} kernel_flags_t;
+
+kernel_flags_t kernel_flags = {0};
+char cmdline[1024] = {0};
 multiboot_info_t mboot_s = {0};
 
 void test_handler() {
@@ -129,7 +136,7 @@ void kernel_thread() {
     }
 
     vesa_init();
-    vesa_switch_to_best_mode();
+    vesa_switch_to_best_mode(kernel_flags.nographic);
 
     kprintf("Screen resolution: %dx%d (bpp %d)\n", current_mode->width, current_mode->height, current_mode->bpp);
 
@@ -190,6 +197,24 @@ void kmain(multiboot_info_t* mboot, uint32_t magic) {
     }
 
     memcpy((uint8_t*)mboot, (uint8_t*)&mboot_s, sizeof(multiboot_info_t));
+    uint32_t cmdline_len = strlen((char*)mboot_s.cmdline);
+
+    if (cmdline_len > sizeof(cmdline)) {
+        kprintf("Command line too long! (max %d)\n", sizeof(cmdline));
+        UNREACHEBLE;
+    }
+
+    memcpy((uint8_t*)mboot_s.cmdline, (uint8_t*)cmdline, cmdline_len);
+
+    char* token = strtok((char*)mboot_s.cmdline, " ");
+    while (token != NULL) {
+        if (strcmp(token, "nographic") == 0) {
+            ser_printf("nographic mode enabled!\n");
+            kernel_flags.nographic = true;
+        }
+        token = strtok(NULL, " ");
+    }
+
 
     idt_init();
     tss_init();
@@ -197,7 +222,8 @@ void kmain(multiboot_info_t* mboot, uint32_t magic) {
     acpi_init();
     mm_memory_setup(&mboot_s);
     vesa_init_early(&mboot_s);
-    screen_init();
+    if (kernel_flags.nographic)
+        screen_init();
 
     pic_remap(32, 40);
     apic_configure();

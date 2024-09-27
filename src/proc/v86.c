@@ -178,6 +178,7 @@ void v86_monitor(core_locals_t* locals) {
 
                 switch (int_num) {
                     case 0x03: {
+                    _exit_v86:
                         V86_LOG("v86_exit\n");
                         regs->base.cs = DESC_SEG(DESC_KERNEL_CODE, PL_RING0);
                         regs->base.ds = DESC_SEG(DESC_KERNEL_DATA, PL_RING0);
@@ -215,6 +216,10 @@ void v86_monitor(core_locals_t* locals) {
                 thread->flags.v86_if = TEST_BIT(eflags, 9) != 0;
 
                 V86_LOG("iret => %04x:%04x\n", regs->base.cs, regs->base.eip);
+                if (regs->base.eip && 0xFFFF0000) {
+                    V86_LOG("!!!BAD EIP!!!: ");
+                    goto _exit_v86;
+                }
             } goto _ok;
 
             case 0xfa: { /* CLI */

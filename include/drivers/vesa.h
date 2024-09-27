@@ -132,7 +132,7 @@ void                    vesa_init_early(multiboot_info_t* mboot);
 void                    vesa_init();
 vesa_video_mode_t*      vesa_find_mode(uint32_t width, uint32_t height, uint8_t bpp);
 void                    vesa_set_mode(vesa_video_mode_t* mode);
-void					vesa_switch_to_best_mode();
+void					vesa_switch_to_best_mode(bool force_text);
 void 					vesa_put_symbol(vesa_vector2_t pos, char c, vesa_color_t color);
 void					vesa_render_symbol(vesa_vector2_t pos, char c, font_t* font, vesa_color_t text_color);
 void                    vesa_scroll(uint32_t rows, vesa_color_t bg);

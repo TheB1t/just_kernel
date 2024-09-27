@@ -1,0 +1,29 @@
+name: CMake on a single platform
+
+on:
+  push:
+    branches: ["dev/testing"]
+  pull_request:
+    branches: ["dev/testing"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt-get install -y build-essential qemu qemu-system nasm yasm gcc binutils make cmake grub-pc
+
+    - name: Configure
+      run: bash ./utils.sh init
+
+    - name: Build
+      run: bash ./utils.sh pack
+
+    - name: Run
+      run: bash ./utils.sh run_test
+
+    - name: Print serial info
+      run: cat serial.log

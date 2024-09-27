@@ -1,0 +1,157 @@
+c[?7l[2J[0mSeaBIOS (version 1.16.2-debian-1.16.2-1)
+
+
+iPXE (http://ipxe.org) 00:02.0 CA00 PCI2.10 PnP PMM+3EFCEEF0+3EF0EEF0 CA00
+Press Ctrl-B to configure iPXE (PCI 00:02.0)...                                                                               
+
+
+Booting from Hard Disk...
+GRUB loading.....
+[0;30;47mWelcome to GRUB![10;16H
+
+[01;01H[0m[2J[02;24HGNU GRUB  version 2.06-13+deb12u1[04;02H┌────────────────────────────────────────────────────────────────────────────┐[05;02H│[05;79H│[06;02H│[06;79H│[07;02H│[07;79H│[08;02H│[08;79H│[09;02H│[09;79H│[10;02H│[10;79H│[11;02H│[11;79H│[12;02H│[12;79H│[13;02H│[13;79H│[14;02H│[14;79H│[15;02H│[15;79H│[16;02H│[16;79H│[17;02H│[17;79H│[18;02H└────────────────────────────────────────────────────────────────────────────┘[20;02H     Use the ↑ and ↓ keys to select which entry is highlighted.          
+      Press enter to boot the selected OS, `e' to edit the commands       
+      bef[22;09H[22;10Hore booting or `c' for a command-line.                           [05;80H [05;03H[0;30;47m*pixOS                                  [05;42H[05;43H                                    [06;03H[0m                                                                           [06;77H[06;78H [07;03H                                                                            [08;03H                                                                            [09;03H                                                                            [10;03H                                                                            [11;03H         [11;11H[11;12H                                                                   [12;03H                                                                            [13;03H                                                                            [14;03H                                                                            [15;03H                                                                            [16;03H                                  [16;36H[16;37H                                          [17;03H                                                                            [17;80H 
+
+
+
+
+
+   The highlighted en[23;21H[23;22Htry will be executed automatically in 1s.                 [05;78H
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   The hig[23;10H[23;11Hhlighted entry will be executed automatically in 0s.                 [01;01H[2J[2J  Booting `pixOS'
+
+nographic mode enabled!
+[ACPI] Found RSDP at 0x000f59e0
+[ACPI] Found MADT at 0x3ffe22ba
+[MM] Memory map provided by bootloader:
+   [0] 0x00000000 - 0x0009fc00 [AVAILABLE]
+   [1] 0x0009fc00 - 0x000a0000 [RESERVED]
+   [2] 0x000f0000 - 0x00100000 [RESERVED]
+   [3] 0x00100000 - 0x3ffdf000 [AVAILABLE]
+   [4] 0x3ffdf000 - 0x40000000 [RESERVED]
+   [5] 0xb0000000 - 0xc0000000 [RESERVED]
+   [6] 0xfed1c000 - 0xfed20000 [RESERVED]
+   [7] 0xfffc0000 - 0x00000000 [RESERVED]
+   [8] 0x00000000 - 0x00000000 [RESERVED]
+[PMM] kernel: 0x00100000 - 0x0013e000
+Register 0x0010afa3 as handler for 0x0e
+[MM] Kernel heap initialized
+[VESA] Framebuffer address: 0x000b8000 (size 4000, pages 1)
+[VESA] Display info:
+    - type: text
+    - pitch: 160
+    - width: 80
+    - height: 25
+    - bpp: 16
+[MADT] MADT entries:
+   LAPIC: ACPI ID   0, APIC ID   0, flags 0x00000001
+   LAPIC: ACPI ID   1, APIC ID   1, flags 0x00000001
+   LAPIC: ACPI ID   2, APIC ID   2, flags 0x00000001
+   LAPIC: ACPI ID   3, APIC ID   3, flags 0x00000001
+   IOAPIC: id   0, addr 0xfec00000, GSI Base 0x00000000
+   ISO: bus   0, IRQ   2, GSI   0, flags 0x0000000a
+   ISO: bus   0, IRQ   5, GSI  13, flags 0x0000000a
+   ISO: bus   0, IRQ   9, GSI  13, flags 0x0000000a
+   ISO: bus   0, IRQ  10, GSI  13, flags 0x0000000a
+   ISO: bus   0, IRQ  11, GSI  13, flags 0x0000000a
+   NMI: Processor ID 255, LINT   1, Flags   0
+[APIC] LAPIC addr: 0xfee00000
+[APIC] CPUs: 4, ISOs: 5, IOAPICs: 1, NMIs: 1
+[APIC][IOAPIC#0] Masked GSI's { 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 }
+[APIC][IOAPIC#0] Mapped ISO to GSI's {
+     2 GSI ->   0 IRQ (LAPIC 0)
+     5 GSI ->   5 IRQ (LAPIC 0)
+     9 GSI ->   9 IRQ (LAPIC 0)
+    10 GSI ->  10 IRQ (LAPIC 0)
+    11 GSI ->  11 IRQ (LAPIC 0)
+}
+[APIC] Mapped GSI's {
+     0 GSI ->   0 IRQ (LAPIC 0)
+     1 GSI ->   1 IRQ (LAPIC 0)
+     3 GSI ->   3 IRQ (LAPIC 0)
+     4 GSI ->   4 IRQ (LAPIC 0)
+     6 GSI ->   6 IRQ (LAPIC 0)
+     7 GSI ->   7 IRQ (LAPIC 0)
+     8 GSI ->   8 IRQ (LAPIC 0)
+    12 GSI ->  12 IRQ (LAPIC 0)
+    13 GSI ->  13 IRQ (LAPIC 0)
+    14 GSI ->  14 IRQ (LAPIC 0)
+    15 GSI ->  15 IRQ (LAPIC 0)
+}
+[GRUB] Loaded 1 modules
+[GRUB] Loaded section table
+Register 0x00101fb6 as handler for 0x20
+PIT divisor 4772, time 3999
+[SCHED] Initializing scheduler...
+Register 0x0010bcd2 as handler for 0xf0
+Register 0x0010bd0c as handler for 0xf1
+[SCHED] Scheduler initialized
+Register 0x0010c1dc as handler for 0x80
+[SMP] Start initialization
+[SMP] Core 0 is BSP.
+[SMP] Core 1 on configuration step! Waiting...
+[SMP] Core 1 booted!
+[SMP] Core 2 on configuration step! Waiting...
+[SMP] Core 2 booted!
+[SMP] Core 3 on configuration step! Waiting...
+[SMP] Core 3 booted!
+[SMP] End initialization, 4 cores booted
+Register 0x0010c8c7 as handler for 0x0d
+Found ramdisk at 0x18d000
+VFS: Mounted root (ramdisk filesystem) readonly.
+running v86 call 0x01001f54
+v86_monitor: cs:ip = 0000:7c01 ss:sp = 0000:a000: interrupt 0x10 => f000:d28b
+v86_monitor: cs:ip = f000:d28b ss:sp = 0000:9ff8: pushf
+v86_monitor: cs:ip = f000:d292 ss:sp = 0000:9ff2: cli
+v86_monitor: cs:ip = f000:d35f ss:sp = 0000:9fee: cli
+v86_monitor: cs:ip = f000:d400 ss:sp = 0000:9ff2: iret => 0002:c000578b
+!!!BAD EIP!!!: v86_exit
+AX: 0x75f8, BX: 0xe7c1, CX 0x39d7
+DX: 0x0104, SI: 0x0000, DI 0x0000
+BP: 0x0002, SP: 0xdf89
+done with v86 call 0x01001f54
+[VESA] VBE not supported
+mem: 3, pfd: 4
+readed: Hello from mem reader!
+SERIAL CONSOLE BABY
+[BMP] Picture size: 1000 x 722
+[BMP] Planes: 1
+[BMP] Bits-per-pixel: 24
+[BMP] Compression: 0
+[BMP] Pixel data size: 2166000
+Hello from syscall! (core 0, test0Hello from syscall! (core 3, test0, tid 7, in_irq 1, cs 0x08)
+, tid 6, in_irq 1, cs 0x08)
+[3][test0:7] Terminated with exitcode 0xdeadbeef
+[0][test0:6] Terminated with exitcode 0xdeadbeef
+Hello from syscall! (core 0, test0, tid 8, in_irq 1, cs 0x08)
+[0][test0:8] Terminated with exitcode 0xdeadbeef
+Hello from syscall! (core 3, test0, tid 9, in_irq 1, cs 0x08)
+[3][test0:9] Terminated with exitcode 0xdeadbeef
+Hello from syscall! (core 2, test1, tid 10, in_irq 1, cs 0x1b)
+[2][test1:10] Terminated with exitcode 0xdeadbeef
+Hello from syscall! (core 1, test1, tid 11, in_irq 1, cs 0x1b)
+[1][test1:11] Terminated with exitcode 0xdeadbeef
+[0][_kernel:0] Sleeping for 1000 ms
+Hello from syscall! (core 2, test1, tid 12, in_irq 1, cs 0x1b)
+[2][test1:12] Terminated with exitcode 0xdeadbeef
+Hello from syscall! (core 0, test1, tid 13, in_irq 1, cs 0x1b)
+[0][test1:13] Terminated with exitcode 0xdeadbeef
+[0][_kernel:0] Terminated with exitcode 0xdeadbeef
+

@@ -126,7 +126,12 @@ function pack() {
 
 #  Run qemu
 function run_qemu() {
-    run sudo qemu-system-x86_64 -m 1024M -hda ${IMAGE_FILE}.img -no-reboot -no-shutdown -serial stdio ${@}
+    run sudo qemu-system-x86_64 -m 1024M -hda ${IMAGE_FILE}.img -no-reboot -no-shutdown -machine q35 -serial stdio ${@}
+}
+
+function run_qemu_test() {
+    run sudo timeout 15s qemu-system-x86_64 -m 1024M -hda ${IMAGE_FILE}.img -machine q35 -serial file:serial.log -nographic ${@}
+    return 0
 }
 
 function main() {
@@ -164,10 +169,20 @@ function main() {
         run bochs
         ;;
     "run")
-        run_qemu -machine q35 --cpu max -smp 4
+        run_qemu --cpu max -smp 4
+        ;;
+    "run_test")
+        run_qemu_test --cpu max -smp 4
+        ;;
+    "make_artifacts")
+        mkdir -p artifacts
+        mkdir -p artifacts/bin
+        cp -r build/bin/* artifacts/bin/
+        cp serial.log artifacts/
+        cp ${IMAGE_FILE}.img artifacts/
         ;;
     "runk")
-        run_qemu -machine q35 --enable-kvm --cpu host -smp 4
+        run_qemu --enable-kvm --cpu host -smp 4
         ;;
     "rund")
         run_qemu -s -S
